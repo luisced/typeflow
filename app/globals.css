@@ -659,6 +659,18 @@ html.dark .modal-scrim {
   border-top: 1px solid var(--border-soft);
 }
 
+.profile-view-full {
+  margin-top: 12px;
+  align-self: flex-start;
+  font-size: 11px;
+  color: var(--accent);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.profile-view-full:hover { text-decoration: underline; }
+
 button.profile-run-row {
   width: 100%;
   text-align: left;
