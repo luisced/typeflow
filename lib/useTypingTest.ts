@@ -1,0 +1,275 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  applyKey,
+  appendWords,
+  correctChars,
+  createState,
+  EngineState,
+} from "./engine";
+import {
+  initialQuote,
+  initialSampleWords,
+  randomQuote,
+  sampleWords,
+} from "./content";
+import {
+  computeAccuracy,
+  computeConsistency,
+  computeWpm,
+  totalTypedChars,
+} from "./stats";
+import { loadHistory, personalBest, saveRun } from "./storage";
+import { queueRun, syncNow } from "./sync";
+import type { RunRecord, TestConfig } from "./types";
+
+type Phase = "idle" | "running" | "finished" | "paused";
+
+function buildWords(config: TestConfig): string[] {
+  if (config.mode === "quote") return randomQuote();
+  if (config.mode === "words") return sampleWords(config.value);
+  return sampleWords(60); // time mode: seed, extended on demand
+}
+
+function buildInitialWords(config: TestConfig): string[] {
+  if (config.mode === "quote") return initialQuote();
+  if (config.mode === "words") return initialSampleWords(config.value);
+  return initialSampleWords(60);
+}
+
+export interface TestResult {
+  record: RunRecord;
+  isPB: boolean;
+  prevBest: number;
+}
+
+export function useTypingTest(config: TestConfig) {
+  // Seed deterministic content for the first render so the typing area is
+  // never blank before client effects run or after hot-refresh edge cases.
+  const [engine, setEngine] = useState<EngineState>(() =>
+    createState(buildInitialWords(config))
+  );
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [elapsed, setElapsed] = useState(0); // seconds, fractional
+  const [result, setResult] = useState<TestResult | null>(null);
+
+  const startRef = useRef<number | null>(null);
+  const samplesRef = useRef<number[]>([]);
+  const correctSamplesRef = useRef<number[]>([]);
+  const lastSampleSec = useRef(0);
+  const engineRef = useRef(engine);
+  useEffect(() => {
+    engineRef.current = engine;
+  }, [engine]);
+  const rafRef = useRef<number | undefined>(undefined);
+
+  // Swap the deterministic SSR seed for randomized content once mounted,
+  // as long as the user hasn't started typing yet.
+  useEffect(() => {
+    setEngine((prev) =>
+      prev.totalKeystrokes === 0 && prev.wordIndex === 0
+        ? createState(buildWords(config))
+        : prev
+    );
+    // mount only — config changes go through reset()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const reset = useCallback(
+    (next?: TestConfig) => {
+      const cfg = next ?? config;
+      setEngine(createState(buildWords(cfg)));
+      setPhase("idle");
+      setElapsed(0);
+      setResult(null);
+      startRef.current = null;
+      samplesRef.current = [];
+      correctSamplesRef.current = [];
+      lastSampleSec.current = 0;
+    },
+    [config]
+  );
+
+  const finish = useCallback(
+    (finalEngine: EngineState, durationSec: number) => {
+      const correct = correctChars(finalEngine);
+      const typedChars = totalTypedChars(finalEngine);
+      const { wpm, raw } = computeWpm(correct, typedChars, durationSec || 0.001);
+      const accuracy = computeAccuracy(finalEngine);
+      const consistency = computeConsistency(samplesRef.current);
+
+      const history = loadHistory();
+      const prevBest = personalBest(history, config.mode, config.value);
+
+      const record: RunRecord = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        mode: config.mode,
+        value: config.value,
+        wpm,
+        raw,
+        accuracy,
+        consistency,
+        durationSec: Math.round(durationSec * 10) / 10,
+        date: Date.now(),
+        errorMap: finalEngine.errorMap,
+        keyMap: finalEngine.keyMap,
+        samples: samplesRef.current.slice(),
+      };
+      saveRun(record);
+      queueRun(record.id);
+      void syncNow();
+      setResult({ record, isPB: wpm > prevBest && wpm > 0, prevBest });
+      setPhase("finished");
+    },
+    [config]
+  );
+
+  // animation-frame timer: updates elapsed, records per-second samples,
+  // and ends time-mode runs. Keeps running while paused — pause guards
+  // against stray keystrokes but never stops the clock (no free rest time).
+  useEffect(() => {
+    if (phase !== "running" && phase !== "paused") return;
+
+    const tick = () => {
+      const start = startRef.current;
+      if (start == null) {
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      const now = performance.now();
+      const sec = (now - start) / 1000;
+      setElapsed(sec);
+
+      // sample WPM each whole second
+      const whole = Math.floor(sec);
+      if (whole > lastSampleSec.current) {
+        for (let s = lastSampleSec.current + 1; s <= whole; s++) {
+          const correct = correctChars(engineRef.current);
+          // instantaneous WPM for this second = chars typed *in* this
+          // second (delta vs previous cumulative sample), not the
+          // cumulative average — the graph and consistency rely on it
+          const prev = s >= 2 ? correctSamplesRef.current[s - 2] ?? 0 : 0;
+          correctSamplesRef.current[s - 1] = correct;
+          const delta = Math.max(0, correct - prev);
+          samplesRef.current[s - 1] = Math.round((delta / 5) * 60);
+        }
+        lastSampleSec.current = whole;
+      }
+
+      if (config.mode === "time" && sec >= config.value) {
+        cancelAnimationFrame(rafRef.current!);
+        finish(engineRef.current, config.value);
+        return;
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current!);
+  }, [phase, config, finish]);
+
+  const onKey = useCallback(
+    (key: string) => {
+      if (phase === "finished" || phase === "paused") return;
+
+      // start on first printable key
+      if (phase === "idle") {
+        if (key === "Backspace" || key === " " || key.length !== 1) return;
+        startRef.current = performance.now();
+        setPhase("running");
+      }
+
+      setEngine((prev) => {
+        let next = applyKey(prev, key, config.mode);
+        // keep an endless stream for time mode
+        if (
+          config.mode === "time" &&
+          next.wordIndex >= next.words.length - 10
+        ) {
+          next = appendWords(next, sampleWords(30));
+        }
+        return next;
+      });
+    },
+    [phase, config]
+  );
+
+  const resumeWithKey = useCallback(
+    (key: string) => {
+      if (phase !== "paused") {
+        onKey(key);
+        return;
+      }
+
+      // no start-time shift: paused time stays on the clock
+      setPhase("running");
+
+      setEngine((prev) => {
+        let next = applyKey(prev, key, config.mode);
+        if (
+          config.mode === "time" &&
+          next.wordIndex >= next.words.length - 10
+        ) {
+          next = appendWords(next, sampleWords(30));
+        }
+        return next;
+      });
+    },
+    [phase, onKey, config]
+  );
+
+  // finish word/quote runs once the engine reports completion
+  useEffect(() => {
+    if (phase !== "running" || !engine.finished || config.mode === "time")
+      return;
+    const dur = startRef.current
+      ? (performance.now() - startRef.current) / 1000
+      : elapsed;
+    finish(engine, dur);
+  }, [engine.finished, phase, config.mode, engine, elapsed, finish]);
+
+  const pause = useCallback(() => {
+    setPhase((p) => (p === "running" ? "paused" : p));
+  }, []);
+  const resume = useCallback(() => {
+    // no start-time shift: paused time stays on the clock
+    setPhase((p) => (p === "paused" ? "running" : p));
+  }, []);
+
+  const remaining =
+    config.mode === "time" ? Math.max(0, config.value - elapsed) : null;
+
+  return {
+    engine,
+    phase,
+    elapsed,
+    remaining,
+    result,
+    onKey,
+    reset,
+    pause,
+    resume,
+    resumeWithKey,
+    // elapsed is already in the return below, just making sure liveWpm/liveAccuracy
+    // use it correctly.
+    // Don't show WPM until 3s in — avoids the wild values at the start.
+    // After 3s, smooth with a 5s rolling window so it doesn't thrash.
+    liveWpm: (() => {
+      if (elapsed < 3) return 0;
+      const correct = correctChars(engine);
+      if (elapsed <= 5) {
+        return computeWpm(correct, correct, elapsed).wpm;
+      }
+
+      const trailingWindow = 5;
+      const baseline =
+        correctSamplesRef.current[
+          Math.max(0, Math.floor(elapsed) - trailingWindow) - 1
+        ] ?? 0;
+      const recentCorrect = Math.max(0, correct - baseline);
+      return computeWpm(recentCorrect, recentCorrect, trailingWindow).wpm;
+    })(),
+    liveAccuracy: computeAccuracy(engine),
+  };
+}
