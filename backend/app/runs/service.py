@@ -1,5 +1,6 @@
 import uuid
-from datetime import datetime, timezone
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,7 +10,17 @@ from app.auth import repository as auth_repo
 from app.core.db import as_utc, utcnow
 from app.runs import repository as repo
 from app.runs.models import Run
-from app.runs.schemas import BatchOut, RunIn, RunOut, RunSummaryOut, SummaryPage, SyncPage
+from app.runs.schemas import (
+    BatchOut,
+    DailyStatOut,
+    ProfileStatsOut,
+    ProfileSummaryOut,
+    RunIn,
+    RunOut,
+    RunSummaryOut,
+    SummaryPage,
+    SyncPage,
+)
 
 
 def _ms_to_dt(ms: int) -> datetime:
@@ -132,3 +143,94 @@ async def clear_history(db: AsyncSession, user_id: uuid.UUID) -> None:
     if user is not None:
         user.clear_epoch = utcnow()
     await db.commit()
+
+
+def _key_accuracy_for_run(
+    error_map: dict[str, int], key_map: dict[str, int]
+) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for key, presses in key_map.items():
+        if presses <= 0:
+            continue
+        errors = error_map.get(key, 0)
+        out[key] = max(0, round(100 * (1 - errors / presses)))
+    return out
+
+
+async def profile_stats(db: AsyncSession, user_id: uuid.UUID) -> ProfileStatsOut:
+    runs = await repo.all_for_user(db, user_id)
+
+    if not runs:
+        return ProfileStatsOut(
+            summary=ProfileSummaryOut(
+                best_wpm=0,
+                avg_wpm=0,
+                avg_accuracy=0,
+                total_runs=0,
+                total_time_sec=0,
+            ),
+            daily_stats=[],
+            key_accuracy={},
+            key_trends={},
+        )
+
+    best_wpm = max(r.wpm for r in runs)
+    avg_wpm = round(sum(r.wpm for r in runs) / len(runs))
+    avg_accuracy = round(sum(r.accuracy for r in runs) / len(runs))
+    total_time = sum(r.duration_sec for r in runs)
+
+    daily: dict[str, list[int]] = defaultdict(list)
+    cutoff = utcnow() - timedelta(days=365)
+    for r in runs:
+        if as_utc(r.finished_at) < cutoff:
+            continue
+        day = as_utc(r.finished_at).date().isoformat()
+        daily[day].append(r.wpm)
+
+    daily_stats = [
+        DailyStatOut(
+            date=day, avg_wpm=round(sum(wpms) / len(wpms)), run_count=len(wpms)
+        )
+        for day, wpms in sorted(daily.items())
+    ]
+
+    agg_errors: dict[str, int] = defaultdict(int)
+    agg_presses: dict[str, int] = defaultdict(int)
+    per_run_key_acc: list[tuple[datetime, dict[str, int]]] = []
+
+    for r in runs:
+        detail = r.detail or {}
+        key_map = detail.get("keyMap") or {}
+        if not key_map:
+            continue
+        error_map = detail.get("errorMap") or {}
+        run_acc = _key_accuracy_for_run(error_map, key_map)
+        per_run_key_acc.append((as_utc(r.finished_at), run_acc))
+        for key, presses in key_map.items():
+            agg_presses[key] += presses
+            agg_errors[key] += error_map.get(key, 0)
+
+    key_accuracy = {
+        key: max(0, round(100 * (1 - agg_errors[key] / agg_presses[key])))
+        for key in agg_presses
+        if agg_presses[key] > 0
+    }
+
+    recent = per_run_key_acc[-50:]
+    key_trends: dict[str, list[int]] = defaultdict(list)
+    for _, run_acc in recent:
+        for key, acc in run_acc.items():
+            key_trends[key].append(acc)
+
+    return ProfileStatsOut(
+        summary=ProfileSummaryOut(
+            best_wpm=best_wpm,
+            avg_wpm=avg_wpm,
+            avg_accuracy=avg_accuracy,
+            total_runs=len(runs),
+            total_time_sec=total_time,
+        ),
+        daily_stats=daily_stats,
+        key_accuracy=dict(key_accuracy),
+        key_trends={k: v for k, v in key_trends.items() if k in key_accuracy},
+    )

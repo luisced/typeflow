@@ -78,3 +78,28 @@ class SyncPage(BaseModel):
     runs: list[RunOut]
     next_after: int = Field(serialization_alias="nextAfter")
     clear_epoch: int = Field(serialization_alias="clearEpoch")  # ms epoch
+
+
+class ProfileSummaryOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    best_wpm: int = Field(serialization_alias="bestWpm")
+    avg_wpm: int = Field(serialization_alias="avgWpm")
+    avg_accuracy: int = Field(serialization_alias="avgAccuracy")
+    total_runs: int = Field(serialization_alias="totalRuns")
+    total_time_sec: float = Field(serialization_alias="totalTimeSec")
+
+
+class DailyStatOut(BaseModel):
+    date: str  # YYYY-MM-DD
+    avg_wpm: int = Field(serialization_alias="avgWpm")
+    run_count: int = Field(serialization_alias="runCount")
+
+
+class ProfileStatsOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    summary: ProfileSummaryOut
+    daily_stats: list[DailyStatOut] = Field(serialization_alias="dailyStats")
+    key_accuracy: dict[str, int] = Field(serialization_alias="keyAccuracy")
+    key_trends: dict[str, list[int]] = Field(serialization_alias="keyTrends")
