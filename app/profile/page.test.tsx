@@ -20,6 +20,7 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 vi.mock("@/lib/api", () => ({
+  attemptSilentRefresh: vi.fn().mockResolvedValue(true),
   fetchProfileStats: vi.fn().mockResolvedValue({
     summary: {
       bestWpm: 127,

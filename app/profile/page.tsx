@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ActivityHeatmap from "@/components/ActivityHeatmap";
 import KeyAccuracyBoard from "@/components/KeyAccuracyBoard";
-import { fetchProfileStats, type ProfileStats } from "@/lib/api";
+import { attemptSilentRefresh, fetchProfileStats, type ProfileStats } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 
 function initials(name: string): string {
@@ -59,9 +59,18 @@ function RetryBanner({ onRetry }: { onRetry: () => void }) {
   );
 }
 
+function formatMemberSince(createdAt: string): string {
+  const d = new Date(createdAt);
+  const months = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+  return `${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
 export default function ProfilePage() {
   const router = useRouter();
-  const user = getUser();
+  const [user, setUser] = useState<ReturnType<typeof getUser>>(null);
   const [stats, setStats] = useState<ProfileStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -81,25 +90,35 @@ export default function ProfilePage() {
   }, []);
 
   useEffect(() => {
-    if (!user) {
-      router.replace("/");
-      return;
-    }
-
     let cancelled = false;
-    void load(() => cancelled);
+
+    const boot = async () => {
+      await attemptSilentRefresh();
+      if (cancelled) return;
+
+      const current = getUser();
+      if (!current) {
+        router.replace("/");
+        return;
+      }
+      setUser(current);
+      await load(() => cancelled);
+    };
+
+    void boot();
     return () => {
       cancelled = true;
     };
-  }, [user, router, load, reloadKey]);
+  }, [router, load, reloadKey]);
 
   const summary = stats?.summary;
-  const memberSince = user
-    ? new Date(user.createdAt).toLocaleDateString(undefined, {
-        month: "short",
-        year: "numeric",
-      })
-    : "";
+  const memberSince = user ? formatMemberSince(user.createdAt) : "";
+
+  if (!user) {
+    return (
+      <div className="profile-page" aria-busy="true" aria-label="Loading profile" />
+    );
+  }
 
   return (
     <div className="profile-page">
