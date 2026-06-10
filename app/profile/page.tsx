@@ -3,9 +3,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ActivityHeatmap from "@/components/ActivityHeatmap";
+import ChartHelp from "@/components/ChartHelp";
+import KeyboardFilterBar from "@/components/KeyboardFilterBar";
+import KeyboardSettings from "@/components/KeyboardSettings";
 import KeyAccuracyBoard from "@/components/KeyAccuracyBoard";
-import { attemptSilentRefresh, fetchProfileStats, type ProfileStats } from "@/lib/api";
+import RunHistoryList from "@/components/RunHistoryList";
+import WpmProgressChart from "@/components/WpmProgressChart";
+import TopBar from "@/components/TopBar";
+import { attemptSilentRefresh, fetchProfileStats, type ProfileStats, type RunFilters } from "@/lib/api";
 import { getUser } from "@/lib/auth";
+import { resolveKeyAccuracyLayout } from "@/lib/keyboards";
+import { useKeyboards } from "@/lib/useKeyboards";
+import { useTheme } from "@/lib/useTheme";
 
 function initials(name: string): string {
   return name
@@ -22,11 +31,15 @@ function StatCard({
   value,
   accent,
   loading,
+  helpLabel,
+  help,
 }: {
   label: string;
   value: string | number;
   accent?: boolean;
   loading?: boolean;
+  helpLabel: string;
+  help: React.ReactNode;
 }) {
   if (loading) {
     return (
@@ -38,7 +51,12 @@ function StatCard({
 
   return (
     <div className="profile-bento-card profile-stat-card">
-      <p className="profile-stat-label">{label}</p>
+      <div className="profile-stat-label-row">
+        <p className="profile-stat-label">{label}</p>
+        <ChartHelp label={helpLabel} size="sm">
+          {help}
+        </ChartHelp>
+      </div>
       <p
         className={`stat-num profile-stat-value${accent ? " text-accent" : ""}`}
       >
@@ -70,24 +88,27 @@ function formatMemberSince(createdAt: string): string {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { dark, toggle: toggleTheme } = useTheme();
+  const { keyboards } = useKeyboards();
   const [user, setUser] = useState<ReturnType<typeof getUser>>(null);
   const [stats, setStats] = useState<ProfileStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [filters, setFilters] = useState<RunFilters>({});
 
   const load = useCallback(async (cancelled: () => boolean) => {
     setLoading(true);
     setError(false);
     try {
-      const data = await fetchProfileStats();
+      const data = await fetchProfileStats(filters);
       if (!cancelled()) setStats(data);
     } catch {
       if (!cancelled()) setError(true);
     } finally {
       if (!cancelled()) setLoading(false);
     }
-  }, []);
+  }, [filters]);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,6 +134,7 @@ export default function ProfilePage() {
 
   const summary = stats?.summary;
   const memberSince = user ? formatMemberSince(user.createdAt) : "";
+  const keyAccuracyLayout = resolveKeyAccuracyLayout(filters, keyboards);
 
   if (!user) {
     return (
@@ -122,30 +144,15 @@ export default function ProfilePage() {
 
   return (
     <div className="profile-page">
-      <header className="profile-top-nav">
-        <button
-          type="button"
-          className="ghost"
-          onClick={() => router.back()}
-        >
-          ← back to test
-        </button>
-        <span className="wordmark" aria-label="TypeFlow">
-          <span
-            className="font-display italic text-[27px] leading-none"
-            style={{ color: "var(--text)" }}
-          >
-            Type
-          </span>
-          <span
-            className="font-display text-[27px] leading-none"
-            style={{ color: "var(--accent)" }}
-          >
-            Flow
-          </span>
-          <span className="caret-dot" aria-hidden />
-        </span>
-      </header>
+      <div className="topbar-wrap shrink-0">
+        <TopBar
+          variant="profile"
+          onGoHome={() => router.push("/")}
+          onOpenProfile={() => router.push("/profile")}
+          dark={dark}
+          onToggleTheme={toggleTheme}
+        />
+      </div>
 
       <main className="profile-bento">
         {error && !loading && (
@@ -155,6 +162,9 @@ export default function ProfilePage() {
         )}
 
         <div className="profile-bento-top">
+          <div className="profile-filter-strip">
+            <KeyboardFilterBar filters={filters} onChange={setFilters} />
+          </div>
           <div className="profile-bento-card profile-user-hero">
             <div className="profile-avatar" aria-hidden>
               {user ? initials(user.displayName) : ""}
@@ -173,27 +183,65 @@ export default function ProfilePage() {
             value={summary?.bestWpm ?? "—"}
             accent
             loading={loading}
+            helpLabel="What is best WPM?"
+            help={
+              <>
+                Your highest <strong>words per minute</strong> from any single
+                completed test.
+              </>
+            }
           />
           <StatCard
             label="Avg WPM"
             value={summary?.avgWpm ?? "—"}
             loading={loading}
+            helpLabel="What is average WPM?"
+            help={
+              <>
+                The mean WPM across <strong>all</strong> your completed tests.
+              </>
+            }
           />
           <StatCard
             label="Accuracy"
             value={summary ? `${summary.avgAccuracy}%` : "—"}
             loading={loading}
+            helpLabel="What is accuracy?"
+            help={
+              <>
+                Average percentage of correct keystrokes across every completed
+                test.
+              </>
+            }
           />
           <StatCard
             label="Total Runs"
             value={summary?.totalRuns ?? "—"}
             loading={loading}
+            helpLabel="What are total runs?"
+            help={
+              <>
+                How many typing tests you&apos;ve finished and saved to your
+                account.
+              </>
+            }
           />
+        </div>
+
+        <div className="profile-bento-card profile-keyboard-card">
+          <KeyboardSettings />
         </div>
 
         <div className="profile-bento-card">
           <ActivityHeatmap
             dailyStats={stats?.dailyStats ?? []}
+            loading={loading}
+          />
+        </div>
+
+        <div className="profile-bento-card">
+          <WpmProgressChart
+            history={stats?.wpmHistory ?? []}
             loading={loading}
           />
         </div>
@@ -204,8 +252,18 @@ export default function ProfilePage() {
               keyAccuracy={stats?.keyAccuracy ?? {}}
               keyTrends={stats?.keyTrends ?? {}}
               loading={loading}
+              layout={keyAccuracyLayout}
             />
           </div>
+        </div>
+
+        <div className="profile-bento-card profile-run-history-card">
+          <RunHistoryList
+            variant="page"
+            refreshKey={reloadKey}
+            filters={filters}
+            onViewRun={(id) => router.push(`/?run=${encodeURIComponent(id)}`)}
+          />
         </div>
       </main>
     </div>

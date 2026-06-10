@@ -1,5 +1,6 @@
 import { clearSession, setSession, type AuthUser } from "./auth";
-import type { Mode, RunRecord } from "./types";
+import { clearKeyboards } from "./keyboards";
+import type { Keyboard, KeyboardLayout, Mode, RunRecord } from "./types";
 
 export const API_URL =
   process.env.NEXT_PUBLIC_TYPEFLOW_API_URL ?? "http://localhost:8000";
@@ -38,6 +39,14 @@ export type RunSummary = {
   consistency: number;
   durationSec: number;
   date: number;
+  keyboardId?: string;
+  keyboardName?: string;
+  keyboardLayout?: KeyboardLayout;
+};
+
+export type RunFilters = {
+  keyboardId?: string;
+  layout?: KeyboardLayout;
 };
 
 export type ProfileSummary = {
@@ -54,9 +63,15 @@ export type DailyStat = {
   runCount: number;
 };
 
+export type WpmHistoryPoint = {
+  finishedAt: string;
+  wpm: number;
+};
+
 export type ProfileStats = {
   summary: ProfileSummary;
   dailyStats: DailyStat[];
+  wpmHistory: WpmHistoryPoint[];
   keyAccuracy: Record<string, number>;
   keyTrends: Record<string, number[]>;
 };
@@ -210,6 +225,7 @@ export async function logout(): Promise<void> {
     credentials: "include",
   }).catch(() => {});
   accessToken = null;
+  clearKeyboards();
   clearSession();
 }
 
@@ -253,29 +269,49 @@ export async function pullRuns(
   return res.json() as Promise<SyncPage>;
 }
 
+function filtersQuery(filters?: RunFilters): string {
+  if (!filters) return "";
+  const params = new URLSearchParams();
+  if (filters.keyboardId) params.set("keyboardId", filters.keyboardId);
+  if (filters.layout) params.set("layout", filters.layout);
+  const qs = params.toString();
+  return qs ? `&${qs}` : "";
+}
+
 export async function fetchRunSummaryPage(
   after: number,
-  limit = 500
+  limit = 500,
+  filters?: RunFilters
 ): Promise<SummaryPage> {
-  const res = await apiFetch(`/runs/summary?after=${after}&limit=${limit}`);
+  const res = await apiFetch(
+    `/runs/summary?after=${after}&limit=${limit}${filtersQuery(filters)}`
+  );
   if (!res.ok) throw new Error("Summary fetch failed");
   return res.json() as Promise<SummaryPage>;
 }
 
 const SUMMARY_LIMIT = 1000;
 
-export async function fetchProfileStats(): Promise<ProfileStats> {
-  const res = await apiFetch("/runs/profile-stats");
+export async function fetchProfileStats(
+  filters?: RunFilters
+): Promise<ProfileStats> {
+  const params = new URLSearchParams();
+  if (filters?.keyboardId) params.set("keyboardId", filters.keyboardId);
+  if (filters?.layout) params.set("layout", filters.layout);
+  const qs = params.toString();
+  const res = await apiFetch(`/runs/profile-stats${qs ? `?${qs}` : ""}`);
   if (!res.ok) throw new Error("Failed to load profile stats");
   return (await res.json()) as ProfileStats;
 }
 
-export async function fetchRunSummaries(): Promise<RunSummary[]> {
+export async function fetchRunSummaries(
+  filters?: RunFilters
+): Promise<RunSummary[]> {
   const all: RunSummary[] = [];
   let after = 0;
 
   for (;;) {
-    const page = await fetchRunSummaryPage(after);
+    const page = await fetchRunSummaryPage(after, 500, filters);
     all.push(...page.runs);
     if (page.runs.length === 0 || page.nextAfter === after) break;
     after = page.nextAfter;
@@ -285,6 +321,62 @@ export async function fetchRunSummaries(): Promise<RunSummary[]> {
   return all
     .slice(0, SUMMARY_LIMIT)
     .sort((a, b) => b.date - a.date);
+}
+
+type ApiKeyboard = {
+  id: string;
+  name: string;
+  layout: KeyboardLayout;
+  isActive: boolean;
+  createdAt: string;
+};
+
+function toKeyboard(raw: ApiKeyboard): Keyboard {
+  return {
+    id: raw.id,
+    name: raw.name,
+    layout: raw.layout,
+    isActive: raw.isActive,
+    createdAt: raw.createdAt,
+  };
+}
+
+export async function fetchKeyboards(): Promise<Keyboard[]> {
+  const res = await apiFetch("/me/keyboards");
+  if (!res.ok) throw new Error("Failed to load keyboards");
+  const data = (await res.json()) as ApiKeyboard[];
+  return data.map(toKeyboard);
+}
+
+export async function createKeyboard(
+  name: string,
+  layout: KeyboardLayout
+): Promise<Keyboard> {
+  const res = await apiFetch("/me/keyboards", {
+    method: "POST",
+    body: JSON.stringify({ name, layout }),
+  });
+  if (!res.ok) throw new Error("Failed to create keyboard");
+  return toKeyboard((await res.json()) as ApiKeyboard);
+}
+
+export async function updateKeyboard(
+  id: string,
+  patch: { name?: string; layout?: KeyboardLayout; isActive?: boolean }
+): Promise<Keyboard> {
+  const res = await apiFetch(`/me/keyboards/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error("Failed to update keyboard");
+  return toKeyboard((await res.json()) as ApiKeyboard);
+}
+
+export async function deleteKeyboard(id: string): Promise<void> {
+  const res = await apiFetch(`/me/keyboards/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete keyboard");
 }
 
 export async function fetchRunById(id: string): Promise<RunRecord> {
@@ -306,5 +398,6 @@ export async function deleteAccount(): Promise<void> {
   const res = await apiFetch("/me", { method: "DELETE" });
   if (!res.ok) throw new Error("Delete failed");
   accessToken = null;
+  clearKeyboards();
   clearSession();
 }

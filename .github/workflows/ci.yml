@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      TYPEFLOW_DATABASE_URL: sqlite+aiosqlite://
+      TYPEFLOW_RATE_LIMIT_ENABLED: "false"
+      TYPEFLOW_COOKIE_SECURE: "false"
+      TYPEFLOW_ENV: development
+      TYPEFLOW_JWT_SECRET: test-secret-with-at-least-32-bytes-ok!
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install backend dependencies
+        run: uv sync
+
+      - name: Run backend tests
+        run: uv run pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run frontend tests
+        run: pnpm test
+
+      - name: Lint frontend
+        run: pnpm lint

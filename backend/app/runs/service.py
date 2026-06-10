@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 
 from app.auth import repository as auth_repo
 from app.core.db import as_utc, utcnow
+from app.keyboards import service as kb_service
 from app.runs import repository as repo
 from app.runs.models import Run
 from app.runs.schemas import (
@@ -20,6 +21,7 @@ from app.runs.schemas import (
     RunSummaryOut,
     SummaryPage,
     SyncPage,
+    WpmHistoryPointOut,
 )
 
 
@@ -29,6 +31,12 @@ def _ms_to_dt(ms: int) -> datetime:
 
 def _dt_to_ms(dt: datetime) -> int:
     return int(as_utc(dt).timestamp() * 1000)
+
+
+def _keyboard_name(run: Run) -> str | None:
+    if run.keyboard is not None:
+        return run.keyboard.name
+    return None
 
 
 def _to_summary(run: Run) -> RunSummaryOut:
@@ -41,6 +49,9 @@ def _to_summary(run: Run) -> RunSummaryOut:
         consistency=run.consistency,
         duration_sec=run.duration_sec,
         date=_dt_to_ms(run.finished_at),
+        keyboard_id=run.keyboard_id,
+        keyboard_name=_keyboard_name(run),
+        keyboard_layout=run.keyboard_layout,
     )
 
 
@@ -59,7 +70,14 @@ def _to_out(run: Run) -> RunOut:
         error_map=detail.get("errorMap", {}),
         key_map=detail.get("keyMap", {}),
         samples=detail.get("samples", []),
+        raw_samples=detail.get("rawSamples", []),
+        error_seconds=detail.get("errorSeconds", []),
+        key_log=detail.get("keyLog", []),
+        words=detail.get("words", []),
         seq=run.seq,
+        keyboard_id=run.keyboard_id,
+        keyboard_name=_keyboard_name(run),
+        keyboard_layout=run.keyboard_layout,
     )
 
 
@@ -85,6 +103,11 @@ async def push_batch(
         if clear_epoch is not None and finished_at <= clear_epoch:
             skipped.append(client_id)  # cleared history must stay cleared
             continue
+
+        keyboard = await kb_service.resolve_for_run(db, user_id, r.keyboard_id)
+        keyboard_id = keyboard.id if keyboard else None
+        keyboard_layout = keyboard.layout if keyboard else None
+
         db.add(
             Run(
                 user_id=user_id,
@@ -97,7 +120,17 @@ async def push_batch(
                 consistency=r.consistency,
                 duration_sec=r.duration_sec,
                 finished_at=finished_at,
-                detail={"errorMap": r.error_map, "keyMap": r.key_map, "samples": r.samples},
+                detail={
+                    "errorMap": r.error_map,
+                    "keyMap": r.key_map,
+                    "samples": r.samples,
+                    "rawSamples": r.raw_samples,
+                    "errorSeconds": r.error_seconds,
+                    "keyLog": r.key_log,
+                    "words": r.words,
+                },
+                keyboard_id=keyboard_id,
+                keyboard_layout=keyboard_layout,
             )
         )
         accepted.append(client_id)
@@ -119,10 +152,18 @@ async def pull_page(
 
 
 async def summary_page(
-    db: AsyncSession, user_id: uuid.UUID, after: int, limit: int
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    after: int,
+    limit: int,
+    *,
+    keyboard_id: uuid.UUID | None = None,
+    layout: str | None = None,
 ) -> SummaryPage:
     user = await auth_repo.get_user_by_id(db, user_id)
-    rows = await repo.page_after(db, user_id, after, limit)
+    rows = await repo.page_after(
+        db, user_id, after, limit, keyboard_id=keyboard_id, layout=layout
+    )
     return SummaryPage(
         runs=[_to_summary(r) for r in rows],
         next_after=rows[-1].seq if rows else after,
@@ -157,8 +198,16 @@ def _key_accuracy_for_run(
     return out
 
 
-async def profile_stats(db: AsyncSession, user_id: uuid.UUID) -> ProfileStatsOut:
-    runs = await repo.all_for_user(db, user_id)
+async def profile_stats(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    keyboard_id: uuid.UUID | None = None,
+    layout: str | None = None,
+) -> ProfileStatsOut:
+    runs = await repo.all_for_user(
+        db, user_id, keyboard_id=keyboard_id, layout=layout
+    )
 
     if not runs:
         return ProfileStatsOut(
@@ -170,6 +219,7 @@ async def profile_stats(db: AsyncSession, user_id: uuid.UUID) -> ProfileStatsOut
                 total_time_sec=0,
             ),
             daily_stats=[],
+            wpm_history=[],
             key_accuracy={},
             key_trends={},
         )
@@ -222,6 +272,15 @@ async def profile_stats(db: AsyncSession, user_id: uuid.UUID) -> ProfileStatsOut
         for key, acc in run_acc.items():
             key_trends[key].append(acc)
 
+    sorted_runs = sorted(runs, key=lambda r: as_utc(r.finished_at))
+    wpm_history = [
+        WpmHistoryPointOut(
+            finished_at=as_utc(r.finished_at).isoformat(),
+            wpm=r.wpm,
+        )
+        for r in sorted_runs[-100:]
+    ]
+
     return ProfileStatsOut(
         summary=ProfileSummaryOut(
             best_wpm=best_wpm,
@@ -231,6 +290,7 @@ async def profile_stats(db: AsyncSession, user_id: uuid.UUID) -> ProfileStatsOut
             total_time_sec=total_time,
         ),
         daily_stats=daily_stats,
+        wpm_history=wpm_history,
         key_accuracy=dict(key_accuracy),
         key_trends={k: v for k, v in key_trends.items() if k in key_accuracy},
     )

@@ -18,11 +18,13 @@ import {
   computeAccuracy,
   computeConsistency,
   computeWpm,
+  isMissKeystroke,
   totalTypedChars,
 } from "./stats";
 import { loadHistory, personalBest, saveRun } from "./storage";
+import { getActiveKeyboardId } from "./keyboards";
 import { queueRun, syncNow } from "./sync";
-import type { RunRecord, TestConfig } from "./types";
+import type { RunRecord, TestConfig, KeyEvent } from "./types";
 
 type Phase = "idle" | "running" | "finished" | "paused";
 
@@ -56,7 +58,11 @@ export function useTypingTest(config: TestConfig) {
 
   const startRef = useRef<number | null>(null);
   const samplesRef = useRef<number[]>([]);
+  const rawSamplesRef = useRef<number[]>([]);
   const correctSamplesRef = useRef<number[]>([]);
+  const typedSamplesRef = useRef<number[]>([]);
+  const errorSecondsRef = useRef<number[]>([]);
+  const keylogRef = useRef<KeyEvent[]>([]);
   const lastSampleSec = useRef(0);
   const engineRef = useRef(engine);
   useEffect(() => {
@@ -79,13 +85,19 @@ export function useTypingTest(config: TestConfig) {
   const reset = useCallback(
     (next?: TestConfig) => {
       const cfg = next ?? config;
-      setEngine(createState(buildWords(cfg)));
+      const fresh = createState(buildWords(cfg));
+      engineRef.current = fresh;
+      setEngine(fresh);
       setPhase("idle");
       setElapsed(0);
       setResult(null);
       startRef.current = null;
       samplesRef.current = [];
+      rawSamplesRef.current = [];
       correctSamplesRef.current = [];
+      typedSamplesRef.current = [];
+      errorSecondsRef.current = [];
+      keylogRef.current = [];
       lastSampleSec.current = 0;
     },
     [config]
@@ -115,6 +127,13 @@ export function useTypingTest(config: TestConfig) {
         errorMap: finalEngine.errorMap,
         keyMap: finalEngine.keyMap,
         samples: samplesRef.current.slice(),
+        rawSamples: rawSamplesRef.current.slice(),
+        errorSeconds: errorSecondsRef.current.slice(),
+        keyLog: keylogRef.current.slice(),
+        words: finalEngine.words.slice(),
+        ...(getActiveKeyboardId()
+          ? { keyboardId: getActiveKeyboardId() }
+          : {}),
       };
       saveRun(record);
       queueRun(record.id);
@@ -145,14 +164,20 @@ export function useTypingTest(config: TestConfig) {
       const whole = Math.floor(sec);
       if (whole > lastSampleSec.current) {
         for (let s = lastSampleSec.current + 1; s <= whole; s++) {
-          const correct = correctChars(engineRef.current);
+          const eng = engineRef.current;
+          const correct = correctChars(eng);
+          const typed = totalTypedChars(eng);
           // instantaneous WPM for this second = chars typed *in* this
           // second (delta vs previous cumulative sample), not the
           // cumulative average — the graph and consistency rely on it
-          const prev = s >= 2 ? correctSamplesRef.current[s - 2] ?? 0 : 0;
+          const prevCorrect = s >= 2 ? correctSamplesRef.current[s - 2] ?? 0 : 0;
+          const prevTyped = s >= 2 ? typedSamplesRef.current[s - 2] ?? 0 : 0;
           correctSamplesRef.current[s - 1] = correct;
-          const delta = Math.max(0, correct - prev);
-          samplesRef.current[s - 1] = Math.round((delta / 5) * 60);
+          typedSamplesRef.current[s - 1] = typed;
+          const deltaCorrect = Math.max(0, correct - prevCorrect);
+          const deltaTyped = Math.max(0, typed - prevTyped);
+          samplesRef.current[s - 1] = Math.round((deltaCorrect / 5) * 60);
+          rawSamplesRef.current[s - 1] = Math.round((deltaTyped / 5) * 60);
         }
         lastSampleSec.current = whole;
       }
@@ -169,30 +194,59 @@ export function useTypingTest(config: TestConfig) {
     return () => cancelAnimationFrame(rafRef.current!);
   }, [phase, config, finish]);
 
+  // Records a key event into the keylog and, if it's a miss, into errorSeconds.
+  // Must only be called when startRef.current is non-null.
+  const recordKey = useCallback(
+    (prev: EngineState, next: EngineState, key: string) => {
+      const start = startRef.current;
+      if (start == null || prev === next) return;
+      const t = performance.now() - start;
+      const miss = isMissKeystroke(prev, next);
+      keylogRef.current.push({ key, t: Math.round(t * 10) / 10, ok: !miss });
+      if (miss) {
+        errorSecondsRef.current.push(Math.floor(t / 1000));
+      }
+    },
+    []
+  );
+
+  const applyAndRecordKey = useCallback(
+    (key: string) => {
+      const prev = engineRef.current;
+      const applied = applyKey(prev, key, config.mode);
+      recordKey(prev, applied, key);
+
+      let next = applied;
+      // keep an endless stream for time mode
+      if (
+        config.mode === "time" &&
+        next.wordIndex >= next.words.length - 10
+      ) {
+        next = appendWords(next, sampleWords(30));
+      }
+
+      if (next !== prev) {
+        engineRef.current = next;
+        setEngine(next);
+      }
+    },
+    [config, recordKey]
+  );
+
   const onKey = useCallback(
     (key: string) => {
       if (phase === "finished" || phase === "paused") return;
 
       // start on first printable key
-      if (phase === "idle") {
+      if (startRef.current == null) {
         if (key === "Backspace" || key === " " || key.length !== 1) return;
         startRef.current = performance.now();
         setPhase("running");
       }
 
-      setEngine((prev) => {
-        let next = applyKey(prev, key, config.mode);
-        // keep an endless stream for time mode
-        if (
-          config.mode === "time" &&
-          next.wordIndex >= next.words.length - 10
-        ) {
-          next = appendWords(next, sampleWords(30));
-        }
-        return next;
-      });
+      applyAndRecordKey(key);
     },
-    [phase, config]
+    [phase, applyAndRecordKey]
   );
 
   const resumeWithKey = useCallback(
@@ -204,19 +258,9 @@ export function useTypingTest(config: TestConfig) {
 
       // no start-time shift: paused time stays on the clock
       setPhase("running");
-
-      setEngine((prev) => {
-        let next = applyKey(prev, key, config.mode);
-        if (
-          config.mode === "time" &&
-          next.wordIndex >= next.words.length - 10
-        ) {
-          next = appendWords(next, sampleWords(30));
-        }
-        return next;
-      });
+      applyAndRecordKey(key);
     },
-    [phase, onKey, config]
+    [phase, onKey, applyAndRecordKey]
   );
 
   // finish word/quote runs once the engine reports completion

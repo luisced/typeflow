@@ -17,7 +17,9 @@ describe("KeyAccuracyBoard", () => {
       />
     );
 
-    expect(screen.getByText(/click a key/i)).toBeTruthy();
+    expect(
+      document.querySelector(".key-trend-empty")?.textContent
+    ).toMatch(/click a key/i);
     fireEvent.click(screen.getByRole("button", { name: /t key/i }));
     expect(screen.getByText(/82%/)).toBeTruthy();
     expect(screen.getByText(/best/i)).toBeTruthy();
@@ -32,5 +34,21 @@ describe("KeyAccuracyBoard", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /t key/i }));
     expect(screen.getByText(/not enough data yet/i)).toBeTruthy();
+  });
+
+  it("renders dvorak key positions", () => {
+    render(
+      <KeyAccuracyBoard
+        layout="dvorak"
+        keyAccuracy={{ p: 90 }}
+        keyTrends={{ p: [88, 90] }}
+      />
+    );
+
+    const keyboard = document.querySelector(".key-accuracy-keyboard");
+    expect(keyboard?.getAttribute("data-layout")).toBe("dvorak");
+    expect(screen.getByText("Dvorak")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /p key/i }));
+    expect(screen.getByText(/90%/)).toBeTruthy();
   });
 });

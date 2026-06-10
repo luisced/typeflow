@@ -47,6 +47,10 @@ async def test_profile_stats_aggregates_runs(client, make_run):
     assert data["summary"]["totalRuns"] == 3
     assert data["summary"]["totalTimeSec"] == 135
     assert len(data["dailyStats"]) >= 1
+    assert len(data["wpmHistory"]) == 3
+    wpms = [p["wpm"] for p in data["wpmHistory"]]
+    assert wpms[-1] == 120
+    assert sorted(wpms) == [80, 100, 120]
     assert data["keyAccuracy"]["t"] == 91
     assert "g" not in data["keyAccuracy"]
     assert len(data["keyTrends"]["t"]) == 2

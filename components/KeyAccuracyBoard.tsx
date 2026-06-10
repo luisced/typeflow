@@ -1,18 +1,21 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import ChartHelp from "@/components/ChartHelp";
+import { layoutLabel, layoutRows } from "@/lib/keyboards";
+import type { KeyboardLayout } from "@/lib/types";
 
 interface Props {
   keyAccuracy: Record<string, number>;
   keyTrends: Record<string, number[]>;
   loading?: boolean;
+  layout?: KeyboardLayout;
 }
 
-const ROWS = [
-  "qwertyuiop".split(""),
-  "asdfghjkl".split(""),
-  "zxcvbnm".split(""),
-];
+function keyDisplay(ch: string): string {
+  if (ch === " ") return "";
+  return ch;
+}
 
 function accuracyStyle(pct: number | undefined): React.CSSProperties {
   if (pct === undefined) {
@@ -44,8 +47,8 @@ function accuracyStyle(pct: number | undefined): React.CSSProperties {
 
 function TrendChart({ data }: { data: number[] }) {
   const gradientId = useId();
-  const W = 220;
-  const H = 70;
+  const W = 300;
+  const H = 96;
   const PAD = { l: 4, r: 8, t: 6, b: 6 };
   const Y_MIN = 60;
   const Y_MAX = 100;
@@ -95,8 +98,14 @@ export default function KeyAccuracyBoard({
   keyAccuracy,
   keyTrends,
   loading,
+  layout = "qwerty",
 }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
+  const rows = layoutRows(layout);
+
+  useEffect(() => {
+    setSelected(null);
+  }, [layout]);
 
   const hasData = Object.keys(keyAccuracy).length > 0;
   const trend = selected ? keyTrends[selected] : undefined;
@@ -123,7 +132,7 @@ export default function KeyAccuracyBoard({
         aria-pressed={isSelected}
         onClick={() => setSelected(ch)}
       >
-        {!isSpace && <span>{ch}</span>}
+        {!isSpace && <span>{keyDisplay(ch)}</span>}
       </button>
     );
   };
@@ -181,11 +190,25 @@ export default function KeyAccuracyBoard({
 
   return (
     <div className="key-accuracy-board">
-      <div className="key-accuracy-keyboard">
-        {ROWS.map((row, ri) => (
-          <div key={ri} className="flex gap-1.5" style={{ marginLeft: ri * 16 }}>
-            {row.map((ch) => (
-              <KeyButton key={ch} ch={ch} />
+      <div className="key-accuracy-header">
+        <div className="key-accuracy-title-row">
+          <h3 className="key-accuracy-title">Key accuracy</h3>
+          <span className="key-accuracy-layout">{layoutLabel(layout)}</span>
+        </div>
+        <ChartHelp label="What is key accuracy?" size="sm">
+          <>
+            Each key is colored by how often you type it correctly.{" "}
+            <strong>Green</strong> is high accuracy, <strong>red</strong> is low.
+            Select a key to see how your accuracy on that key has changed across
+            recent tests.
+          </>
+        </ChartHelp>
+      </div>
+      <div className="key-accuracy-keyboard" data-layout={layout}>
+        {rows.map((row, ri) => (
+          <div key={ri} className="flex gap-2" style={{ marginLeft: ri * 20 }}>
+            {row.map((ch, ci) => (
+              <KeyButton key={`${ri}-${ci}-${ch}`} ch={ch} />
             ))}
           </div>
         ))}

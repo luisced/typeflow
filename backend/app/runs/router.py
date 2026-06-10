@@ -24,18 +24,26 @@ async def push_batch(
 async def pull_summary(
     after: int = Query(default=0, ge=0),
     limit: int = Query(default=500, ge=1, le=1000),
+    keyboard_id: uuid.UUID | None = Query(default=None, alias="keyboardId"),
+    layout: str | None = Query(default=None),
     user_id: uuid.UUID = Depends(current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    return await service.summary_page(db, user_id, after, limit)
+    return await service.summary_page(
+        db, user_id, after, limit, keyboard_id=keyboard_id, layout=layout
+    )
 
 
 @router.get("/profile-stats", response_model=ProfileStatsOut, response_model_by_alias=True)
 async def profile_stats(
+    keyboard_id: uuid.UUID | None = Query(default=None, alias="keyboardId"),
+    layout: str | None = Query(default=None),
     user_id: uuid.UUID = Depends(current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    return await service.profile_stats(db, user_id)
+    return await service.profile_stats(
+        db, user_id, keyboard_id=keyboard_id, layout=layout
+    )
 
 
 @router.get("/{run_id}", response_model=RunOut, response_model_by_alias=True)

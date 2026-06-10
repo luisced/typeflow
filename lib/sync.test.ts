@@ -81,6 +81,21 @@ describe("queueRun + pushPending", () => {
       expect.objectContaining({ id: "run-1" }),
     ]);
   });
+
+  it("includes keyboardId when present on the run", async () => {
+    saveRun({ ...makeRun("run-kb"), keyboardId: "kb-123" });
+    queueRun("run-kb");
+
+    apiMocks.pushRuns.mockResolvedValueOnce({
+      accepted: ["run-kb"],
+      skipped: [],
+    });
+
+    await pushPending();
+    expect(apiMocks.pushRuns).toHaveBeenCalledWith([
+      expect.objectContaining({ id: "run-kb", keyboardId: "kb-123" }),
+    ]);
+  });
 });
 
 describe("pullAndMerge", () => {
@@ -181,7 +196,9 @@ describe("formatLastSyncedAt", () => {
     vi.setSystemTime(now);
 
     expect(formatLastSyncedAt(null)).toBe("Not synced yet");
-    expect(formatLastSyncedAt(now - 30_000)).toBe("just now");
+    expect(formatLastSyncedAt(now - 1_000)).toBe("1 sec ago");
+    expect(formatLastSyncedAt(now - 30_000)).toBe("30 sec ago");
+    expect(formatLastSyncedAt(now - 59_000)).toBe("59 sec ago");
     expect(formatLastSyncedAt(now - 120_000)).toBe("2 min ago");
 
     vi.useRealTimers();

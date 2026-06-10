@@ -1,4 +1,5 @@
-from typing import Literal
+from typing import Any, Literal
+import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -22,6 +23,17 @@ class RunIn(BaseModel):
     error_map: dict[str, int] = Field(alias="errorMap", default_factory=dict)
     key_map: dict[str, int] = Field(alias="keyMap", default_factory=dict)
     samples: list[int] = Field(default_factory=list, max_length=86_400)
+    raw_samples: list[int] = Field(
+        alias="rawSamples", default_factory=list, max_length=86_400
+    )
+    error_seconds: list[int] = Field(
+        alias="errorSeconds", default_factory=list, max_length=86_400
+    )
+    key_log: list[dict[str, Any]] = Field(
+        alias="keyLog", default_factory=list, max_length=20_000
+    )
+    words: list[str] = Field(default_factory=list, max_length=10_000)
+    keyboard_id: uuid.UUID | None = Field(default=None, alias="keyboardId")
 
 
 class RunOut(BaseModel):
@@ -39,7 +51,24 @@ class RunOut(BaseModel):
     error_map: dict[str, int] = Field(serialization_alias="errorMap")
     key_map: dict[str, int] = Field(serialization_alias="keyMap")
     samples: list[int]
+    raw_samples: list[int] = Field(default_factory=list, serialization_alias="rawSamples")
+    error_seconds: list[int] = Field(
+        default_factory=list, serialization_alias="errorSeconds"
+    )
+    key_log: list[dict[str, Any]] = Field(
+        default_factory=list, serialization_alias="keyLog"
+    )
+    words: list[str] = Field(default_factory=list)
     seq: int
+    keyboard_id: uuid.UUID | None = Field(
+        default=None, serialization_alias="keyboardId"
+    )
+    keyboard_name: str | None = Field(
+        default=None, serialization_alias="keyboardName"
+    )
+    keyboard_layout: str | None = Field(
+        default=None, serialization_alias="keyboardLayout"
+    )
 
 
 class BatchIn(BaseModel):
@@ -62,6 +91,15 @@ class RunSummaryOut(BaseModel):
     consistency: int
     duration_sec: float = Field(serialization_alias="durationSec")
     date: int
+    keyboard_id: uuid.UUID | None = Field(
+        default=None, serialization_alias="keyboardId"
+    )
+    keyboard_name: str | None = Field(
+        default=None, serialization_alias="keyboardName"
+    )
+    keyboard_layout: str | None = Field(
+        default=None, serialization_alias="keyboardLayout"
+    )
 
 
 class SummaryPage(BaseModel):
@@ -96,10 +134,16 @@ class DailyStatOut(BaseModel):
     run_count: int = Field(serialization_alias="runCount")
 
 
+class WpmHistoryPointOut(BaseModel):
+    finished_at: str = Field(serialization_alias="finishedAt")
+    wpm: int
+
+
 class ProfileStatsOut(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     summary: ProfileSummaryOut
     daily_stats: list[DailyStatOut] = Field(serialization_alias="dailyStats")
+    wpm_history: list[WpmHistoryPointOut] = Field(serialization_alias="wpmHistory")
     key_accuracy: dict[str, int] = Field(serialization_alias="keyAccuracy")
     key_trends: dict[str, list[int]] = Field(serialization_alias="keyTrends")

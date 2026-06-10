@@ -1,0 +1,35 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# next.js
+.next/
+out/
+
+# env / secrets
+.env.local
+.env*.local
+backend/.env
+backend/.env.docker
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+backend/typeflow.db
+
+# build / cache
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# tooling
+.claude/
+.superpowers/
+
+# os
+.DS_Store
+
+# npm lockfile (project uses pnpm)
+package-lock.json
