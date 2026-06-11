@@ -96,6 +96,35 @@ describe("queueRun + pushPending", () => {
       expect.objectContaining({ id: "run-kb", keyboardId: "kb-123" }),
     ]);
   });
+
+  it("pushes v2 metadata fields on the run", async () => {
+    saveRun({
+      ...makeRun("run-v2"),
+      mode: "practice",
+      flagsKey: "c,n",
+      flags: { capitals: true, numbers: true, punctuation: false },
+      practice: { targetKeys: ["r", "th"] },
+      isComparable: false,
+    });
+    queueRun("run-v2");
+
+    apiMocks.pushRuns.mockResolvedValueOnce({
+      accepted: ["run-v2"],
+      skipped: [],
+    });
+
+    await pushPending();
+    expect(apiMocks.pushRuns).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: "run-v2",
+        mode: "practice",
+        flagsKey: "c,n",
+        flags: { capitals: true, numbers: true, punctuation: false },
+        practice: { targetKeys: ["r", "th"] },
+        isComparable: false,
+      }),
+    ]);
+  });
 });
 
 describe("pullAndMerge", () => {
@@ -119,6 +148,45 @@ describe("pullAndMerge", () => {
 
     await pullAndMerge();
     expect(loadHistory().map((r) => r.id)).toContain("remote-1");
+  });
+
+  it("merges pulled runs with v2 metadata intact", async () => {
+    window.localStorage.setItem(
+      "typeflow.sync.v1",
+      JSON.stringify({ lastPulledSeq: 0, pendingIds: [], clearEpoch: 0 })
+    );
+
+    apiMocks.pullRuns
+      .mockResolvedValueOnce({
+        runs: [
+          {
+            ...makeRun("remote-v2"),
+            mode: "practice",
+            flagsKey: "p",
+            flags: { capitals: false, numbers: false, punctuation: true },
+            practice: { targetKeys: [";"] },
+            isComparable: false,
+            seq: 1,
+          },
+        ],
+        nextAfter: 1,
+        clearEpoch: 0,
+      })
+      .mockResolvedValueOnce({
+        runs: [],
+        nextAfter: 1,
+        clearEpoch: 0,
+      });
+
+    await pullAndMerge();
+    const got = loadHistory().find((r) => r.id === "remote-v2");
+    expect(got).toMatchObject({
+      mode: "practice",
+      flagsKey: "p",
+      flags: { capitals: false, numbers: false, punctuation: true },
+      practice: { targetKeys: [";"] },
+      isComparable: false,
+    });
   });
 
   it("wipes local history when server clearEpoch advances", async () => {

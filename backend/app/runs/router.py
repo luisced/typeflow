@@ -1,12 +1,21 @@
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
-from app.core.security import current_user_id
-from app.runs import service
-from app.runs.schemas import BatchIn, BatchOut, ProfileStatsOut, RunOut, SummaryPage, SyncPage
+from app.core.security import current_user_id, optional_user_id
+from app.runs import leaderboard, service
+from app.runs.schemas import (
+    BatchIn,
+    BatchOut,
+    LeaderboardOut,
+    ProfileStatsOut,
+    RunOut,
+    SummaryPage,
+    SyncPage,
+)
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -26,11 +35,31 @@ async def pull_summary(
     limit: int = Query(default=500, ge=1, le=1000),
     keyboard_id: uuid.UUID | None = Query(default=None, alias="keyboardId"),
     layout: str | None = Query(default=None),
+    flags_key: str | None = Query(default=None, alias="flagsKey"),
     user_id: uuid.UUID = Depends(current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     return await service.summary_page(
-        db, user_id, after, limit, keyboard_id=keyboard_id, layout=layout
+        db,
+        user_id,
+        after,
+        limit,
+        keyboard_id=keyboard_id,
+        layout=layout,
+        flags_key=flags_key,
+    )
+
+
+@router.get("/leaderboard", response_model=LeaderboardOut, response_model_by_alias=True)
+async def get_leaderboard(
+    mode: Literal["time", "words"],
+    value: int = Query(ge=1),
+    timeframe: Literal["all_time", "monthly"] = Query(default="all_time"),
+    db: AsyncSession = Depends(get_db),
+    user_id: uuid.UUID | None = Depends(optional_user_id),
+):
+    return await leaderboard.get_leaderboard(
+        db, mode, value, timeframe=timeframe, user_id=user_id
     )
 
 
@@ -38,11 +67,18 @@ async def pull_summary(
 async def profile_stats(
     keyboard_id: uuid.UUID | None = Query(default=None, alias="keyboardId"),
     layout: str | None = Query(default=None),
+    flags_key: str | None = Query(default=None, alias="flagsKey"),
+    mode: str | None = Query(default=None),
     user_id: uuid.UUID = Depends(current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     return await service.profile_stats(
-        db, user_id, keyboard_id=keyboard_id, layout=layout
+        db,
+        user_id,
+        keyboard_id=keyboard_id,
+        layout=layout,
+        flags_key=flags_key,
+        mode=mode,
     )
 
 

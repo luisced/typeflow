@@ -54,3 +54,38 @@ async def test_profile_stats_aggregates_runs(client, make_run):
     assert data["keyAccuracy"]["t"] == 91
     assert "g" not in data["keyAccuracy"]
     assert len(data["keyTrends"]["t"]) == 2
+
+
+async def test_profile_stats_excludes_practice_runs(client, make_run):
+    headers, _ = await register_user(client)
+    runs = [
+        make_run(id="norm-1", wpm=100),
+        make_run(
+            id="prac-1",
+            mode="practice",
+            wpm=150,
+            isComparable=False,
+            practice={"targetKeys": ["r"]},
+        ),
+    ]
+    await client.post("/runs/batch", json={"runs": runs}, headers=headers)
+
+    res = await client.get("/runs/profile-stats", headers=headers)
+    data = res.json()
+    assert data["summary"]["totalRuns"] == 1
+    assert data["summary"]["bestWpm"] == 100
+
+
+async def test_profile_stats_filters_by_flags_key(client, make_run):
+    headers, _ = await register_user(client)
+    runs = [
+        make_run(id="base-1", wpm=80, flagsKey="base"),
+        make_run(id="caps-1", wpm=95, flagsKey="c"),
+        make_run(id="both-1", wpm=110, flagsKey="c,n"),
+    ]
+    await client.post("/runs/batch", json={"runs": runs}, headers=headers)
+
+    res = await client.get("/runs/profile-stats?flagsKey=c", headers=headers)
+    data = res.json()
+    assert data["summary"]["totalRuns"] == 1
+    assert data["summary"]["bestWpm"] == 95

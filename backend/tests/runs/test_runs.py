@@ -193,6 +193,49 @@ async def test_get_run_by_id_is_isolated(client, make_run):
     ).status_code == 404
 
 
+async def test_push_then_pull_roundtrip_v2_metadata(client, make_run):
+    headers, _ = await register_user(client)
+    run = make_run(
+        id="v2-1",
+        mode="practice",
+        flagsKey="c,n",
+        flags={"capitals": True, "numbers": True, "punctuation": False},
+        practice={"targetKeys": ["r", "th"]},
+        ghost={"referenceRunId": "pb-1", "referenceWpm": 92},
+        isComparable=False,
+    )
+
+    push = await client.post("/runs/batch", json={"runs": [run]}, headers=headers)
+    assert push.status_code == 200
+
+    pull = await client.get("/runs", headers=headers)
+    [got] = pull.json()["runs"]
+    assert got["mode"] == "practice"
+    assert got["flagsKey"] == "c,n"
+    assert got["flags"] == {
+        "capitals": True,
+        "numbers": True,
+        "punctuation": False,
+    }
+    assert got["practice"] == {"targetKeys": ["r", "th"]}
+    assert got["ghost"] == {"referenceRunId": "pb-1", "referenceWpm": 92}
+    assert got["isComparable"] is False
+
+    detail = await client.get("/runs/v2-1", headers=headers)
+    assert detail.status_code == 200
+    assert detail.json()["flagsKey"] == "c,n"
+
+
+async def test_summary_exposes_flags_key(client, make_run):
+    headers, _ = await register_user(client)
+    run = make_run(id="sum-flags", flagsKey="c,p")
+    await client.post("/runs/batch", json={"runs": [run]}, headers=headers)
+
+    res = await client.get("/runs/summary", headers=headers)
+    [got] = res.json()["runs"]
+    assert got["flagsKey"] == "c,p"
+
+
 async def test_validation_rejects_garbage(client, make_run):
     headers, _ = await register_user(client)
     bad_mode = make_run()

@@ -61,6 +61,73 @@ function PencilIcon() {
   );
 }
 
+const MOBILE_KB_MQ = "(max-width: 767px)";
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`kb-header-chevron${open ? " kb-header-chevron-open" : ""}`}
+      aria-hidden
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
+function LayoutField({
+  value,
+  onChange,
+  compact = false,
+}: {
+  value: KeyboardLayout;
+  onChange: (layout: KeyboardLayout) => void;
+  compact?: boolean;
+}) {
+  const pillsClass = compact
+    ? "kb-layout-pills kb-layout-pills-compact kb-layout-desktop"
+    : "kb-layout-pills kb-layout-desktop";
+
+  return (
+    <fieldset className="kb-field kb-field-layout">
+      <legend className="kb-field-label">Layout</legend>
+      <div className={pillsClass} role="group" aria-label="Keyboard layout">
+        {KEYBOARD_LAYOUTS.map((l) => (
+          <button
+            key={l}
+            type="button"
+            className="kb-layout-pill"
+            data-selected={value === l}
+            onClick={() => onChange(l)}
+            aria-pressed={value === l}
+          >
+            {layoutLabel(l)}
+          </button>
+        ))}
+      </div>
+      <select
+        className="filter-select kb-layout-select kb-layout-mobile"
+        value={value}
+        onChange={(e) => onChange(e.target.value as KeyboardLayout)}
+        aria-label="Keyboard layout"
+      >
+        {KEYBOARD_LAYOUTS.map((l) => (
+          <option key={l} value={l}>
+            {layoutLabel(l)}
+          </option>
+        ))}
+      </select>
+    </fieldset>
+  );
+}
+
 export default function KeyboardSettings() {
   const loggedIn = !!getUser();
   const { keyboards, loading, create, update, remove, setActive } = useKeyboards();
@@ -74,6 +141,33 @@ export default function KeyboardSettings() {
   const [editLayout, setEditLayout] = useState<KeyboardLayout>("qwerty");
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [sectionOpen, setSectionOpen] = useState(true);
+  const [addOpen, setAddOpen] = useState(false);
+
+  const activeKeyboard =
+    keyboards.find((kb) => kb.isActive) ?? keyboards[0] ?? null;
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia(MOBILE_KB_MQ);
+    const sync = () => {
+      if (!mq.matches) {
+        setSectionOpen(true);
+        setAddOpen(true);
+        return;
+      }
+      if (keyboards.length === 0) {
+        setSectionOpen(true);
+        setAddOpen(true);
+        return;
+      }
+      setSectionOpen(false);
+      setAddOpen(false);
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, [keyboards.length]);
 
   useEffect(() => {
     if (!editingId) return;
@@ -106,6 +200,9 @@ export default function KeyboardSettings() {
     try {
       await create(trimmed, layout);
       setName("");
+      if (window.matchMedia(MOBILE_KB_MQ).matches) {
+        setAddOpen(false);
+      }
     } catch {
       setError("Could not add keyboard. Check your connection and try again.");
     } finally {
@@ -158,26 +255,47 @@ export default function KeyboardSettings() {
 
   return (
     <section className="kb-panel" aria-labelledby="kb-panel-title">
-      <header className="kb-header">
-        <div className="kb-header-icon" aria-hidden>
-          <KeyboardIcon size={20} />
-        </div>
-        <div className="kb-header-copy">
-          <div className="kb-header-title-row">
-            <h2 id="kb-panel-title" className="kb-title">
-              Keyboards
-            </h2>
-            <ChartHelp label="About keyboards" size="sm">
-              Register each physical keyboard you use. The active keyboard is attached to every
-              run so you can filter stats and history by device or layout.
-            </ChartHelp>
-          </div>
-          <p className="kb-subtitle">
-            Track performance across devices — switch your active setup before each session.
-          </p>
-        </div>
-      </header>
+      <div className="kb-header">
+        <button
+          type="button"
+          className="kb-header-toggle"
+          aria-expanded={sectionOpen}
+          aria-controls="kb-panel-body"
+          onClick={() => setSectionOpen((open) => !open)}
+        >
+          <span className="kb-header-icon" aria-hidden>
+            <KeyboardIcon size={20} />
+          </span>
+          <span className="kb-header-copy">
+            <span className="kb-header-title-row">
+              <span id="kb-panel-title" className="kb-title">
+                Keyboards
+              </span>
+              {!sectionOpen && activeKeyboard && (
+                <span className="kb-header-summary">
+                  {activeKeyboard.name}
+                  <span aria-hidden> · </span>
+                  {layoutLabel(activeKeyboard.layout)}
+                  {keyboards.length > 1 ? ` · ${keyboards.length} saved` : ""}
+                </span>
+              )}
+            </span>
+            <span className="kb-subtitle">
+              Track performance across devices — switch your active setup before each session.
+            </span>
+          </span>
+          <ChevronIcon open={sectionOpen} />
+        </button>
+        <ChartHelp label="About keyboards" size="sm">
+          Register each physical keyboard you use. The active keyboard is attached to every
+          run so you can filter stats and history by device or layout.
+        </ChartHelp>
+      </div>
 
+      <div
+        id="kb-panel-body"
+        className={`kb-body${sectionOpen ? " kb-body-open" : ""}`}
+      >
       {loading && keyboards.length === 0 ? (
         <div className="kb-grid kb-grid-skeleton" aria-busy="true">
           {[0, 1, 2].map((i) => (
@@ -223,23 +341,11 @@ export default function KeyboardSettings() {
                         autoComplete="off"
                       />
                     </label>
-                    <fieldset className="kb-field">
-                      <legend className="kb-field-label">Layout</legend>
-                      <div className="kb-layout-pills kb-layout-pills-compact" role="group" aria-label="Keyboard layout">
-                        {KEYBOARD_LAYOUTS.map((l) => (
-                          <button
-                            key={l}
-                            type="button"
-                            className="kb-layout-pill"
-                            data-selected={editLayout === l}
-                            onClick={() => setEditLayout(l)}
-                            aria-pressed={editLayout === l}
-                          >
-                            {layoutLabel(l)}
-                          </button>
-                        ))}
-                      </div>
-                    </fieldset>
+                    <LayoutField
+                      value={editLayout}
+                      onChange={setEditLayout}
+                      compact
+                    />
                     <div className="kb-edit-actions">
                       <button
                         type="button"
@@ -332,61 +438,57 @@ export default function KeyboardSettings() {
         </ul>
       )}
 
-      <form className="kb-add-panel" onSubmit={onSubmit}>
-        <p className="kb-add-label">
+      {addOpen || keyboards.length === 0 ? (
+        <form className="kb-add-panel" onSubmit={onSubmit}>
+          <p className="kb-add-label">
+            <PlusIcon />
+            Add keyboard
+          </p>
+          <div className="kb-add-row">
+            <label className="kb-field kb-field-grow">
+              <span className="kb-field-label">Name</span>
+              <input
+                type="text"
+                className="kb-input kb-input-lg"
+                placeholder="e.g. Keychron K2, MacBook built-in"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={64}
+                autoComplete="off"
+              />
+            </label>
+            <LayoutField value={layout} onChange={setLayout} />
+            <button
+              type="submit"
+              className="kb-submit"
+              disabled={adding || !name.trim()}
+              aria-busy={adding}
+            >
+              {adding ? (
+                <span className="kb-submit-spinner" aria-hidden />
+              ) : (
+                <PlusIcon />
+              )}
+              {adding ? "Adding…" : "Add"}
+            </button>
+          </div>
+          {error && (
+            <p className="kb-error" role="alert">
+              {error}
+            </p>
+          )}
+        </form>
+      ) : (
+        <button
+          type="button"
+          className="kb-add-trigger ghost"
+          onClick={() => setAddOpen(true)}
+        >
           <PlusIcon />
           Add keyboard
-        </p>
-        <div className="kb-add-row">
-          <label className="kb-field kb-field-grow">
-            <span className="kb-field-label">Name</span>
-            <input
-              type="text"
-              className="kb-input kb-input-lg"
-              placeholder="e.g. Keychron K2, MacBook built-in"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={64}
-              autoComplete="off"
-            />
-          </label>
-          <fieldset className="kb-field kb-field-layout">
-            <legend className="kb-field-label">Layout</legend>
-            <div className="kb-layout-pills" role="group" aria-label="Keyboard layout">
-              {KEYBOARD_LAYOUTS.map((l) => (
-                <button
-                  key={l}
-                  type="button"
-                  className="kb-layout-pill"
-                  data-selected={layout === l}
-                  onClick={() => setLayout(l)}
-                  aria-pressed={layout === l}
-                >
-                  {layoutLabel(l)}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-          <button
-            type="submit"
-            className="kb-submit"
-            disabled={adding || !name.trim()}
-            aria-busy={adding}
-          >
-            {adding ? (
-              <span className="kb-submit-spinner" aria-hidden />
-            ) : (
-              <PlusIcon />
-            )}
-            {adding ? "Adding…" : "Add"}
-          </button>
-        </div>
-        {error && (
-          <p className="kb-error" role="alert">
-            {error}
-          </p>
-        )}
-      </form>
+        </button>
+      )}
+      </div>
     </section>
   );
 }

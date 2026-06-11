@@ -10,6 +10,9 @@ interface Props {
   elapsed: number;
   progress: string; // e.g. "12/25"
   visible: boolean;
+  ghostAhead?: number | null;
+  ghostAccuracy?: number | null;
+  ghostMistakes?: number | null;
 }
 
 export default function LiveStats({
@@ -20,6 +23,9 @@ export default function LiveStats({
   elapsed,
   progress,
   visible,
+  ghostAhead,
+  ghostAccuracy,
+  ghostMistakes,
 }: Props) {
   const showWpm = elapsed >= 3;
 
@@ -28,7 +34,7 @@ export default function LiveStats({
       className="flex items-center gap-6 h-7 transition-opacity duration-300"
       style={{ opacity: visible ? 1 : 0 }}
     >
-      {mode === "time" ? (
+      {mode === "time" || mode === "practice" ? (
         <Metric value={Math.ceil(remaining ?? 0).toString()} label="left" big />
       ) : (
         <Metric value={progress} label="words" big />
@@ -43,6 +49,26 @@ export default function LiveStats({
         label="acc"
         muted={elapsed < 1}
       />
+      {ghostAhead != null && elapsed >= 1 && (
+        <Metric
+          value={ghostAhead > 0 ? `+${ghostAhead}` : ghostAhead.toString()}
+          label="vs ghost"
+          muted={ghostAhead === 0}
+        />
+      )}
+      {ghostAccuracy != null && elapsed >= 1 && (
+        <Metric
+          value={`${ghostAccuracy}%`}
+          label="ghost acc"
+          muted={ghostAccuracy === 100}
+        />
+      )}
+      {ghostMistakes != null && ghostMistakes > 0 && elapsed >= 1 && (
+        <Metric
+          value={ghostMistakes.toString()}
+          label={ghostMistakes === 1 ? "ghost miss" : "ghost misses"}
+        />
+      )}
     </div>
   );
 }

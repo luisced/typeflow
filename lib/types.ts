@@ -1,4 +1,6 @@
-export type Mode = "time" | "words" | "quote";
+import type { ContentFlags } from "./contentFlags";
+
+export type Mode = "time" | "words" | "quote" | "practice";
 
 export type CaretStyle = "line" | "underline" | "block" | "outline";
 
@@ -17,10 +19,20 @@ export interface Keyboard {
   createdAt: string;
 }
 
+export interface PracticeMeta {
+  targetKeys?: string[];
+}
+
+export interface GhostMeta {
+  referenceRunId?: string;
+  referenceWpm?: number;
+}
+
 export interface TestConfig {
   mode: Mode;
   /** seconds for time mode, word count for words mode; ignored for quote */
   value: number;
+  flags?: ContentFlags;
 }
 
 export type CharState = "correct" | "incorrect" | "extra" | "untyped";
@@ -60,4 +72,12 @@ export interface RunRecord {
   keyboardId?: string;
   keyboardName?: string;
   keyboardLayout?: KeyboardLayout;
+  /** Content transforms active during the run (time/words/practice). */
+  flags?: ContentFlags;
+  /** Stable bucket for PB grouping, e.g. "base" or "c,n,p". */
+  flagsKey?: string;
+  practice?: PracticeMeta;
+  ghost?: GhostMeta;
+  /** False for practice runs and other non-comparable sessions. */
+  isComparable?: boolean;
 }

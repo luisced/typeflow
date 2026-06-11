@@ -6,13 +6,32 @@ from pydantic import BaseModel, ConfigDict, Field
 MAX_BATCH = 500
 
 
+class ContentFlagsIn(BaseModel):
+    punctuation: bool = False
+    numbers: bool = False
+    capitals: bool = False
+
+
+class PracticeMetaIn(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    target_keys: list[str] | None = Field(default=None, alias="targetKeys")
+
+
+class GhostMetaIn(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    reference_run_id: str | None = Field(default=None, alias="referenceRunId")
+    reference_wpm: int | None = Field(default=None, alias="referenceWpm")
+
+
 class RunIn(BaseModel):
     """Mirrors the client's RunRecord (camelCase via aliases)."""
 
     model_config = ConfigDict(populate_by_name=True)
 
     id: str = Field(min_length=1, max_length=64)
-    mode: Literal["time", "words", "quote"]
+    mode: Literal["time", "words", "quote", "practice"]
     value: int = Field(ge=0, le=100_000)
     wpm: int = Field(ge=0, le=1_000)
     raw: int = Field(ge=0, le=2_000)
@@ -34,6 +53,11 @@ class RunIn(BaseModel):
     )
     words: list[str] = Field(default_factory=list, max_length=10_000)
     keyboard_id: uuid.UUID | None = Field(default=None, alias="keyboardId")
+    flags_key: str | None = Field(default=None, alias="flagsKey", max_length=32)
+    flags: ContentFlagsIn | None = None
+    practice: PracticeMetaIn | None = None
+    ghost: GhostMetaIn | None = None
+    is_comparable: bool | None = Field(default=None, alias="isComparable")
 
 
 class RunOut(BaseModel):
@@ -69,6 +93,13 @@ class RunOut(BaseModel):
     keyboard_layout: str | None = Field(
         default=None, serialization_alias="keyboardLayout"
     )
+    flags_key: str | None = Field(default=None, serialization_alias="flagsKey")
+    flags: ContentFlagsIn | None = None
+    practice: PracticeMetaIn | None = None
+    ghost: GhostMetaIn | None = None
+    is_comparable: bool | None = Field(
+        default=None, serialization_alias="isComparable"
+    )
 
 
 class BatchIn(BaseModel):
@@ -100,6 +131,7 @@ class RunSummaryOut(BaseModel):
     keyboard_layout: str | None = Field(
         default=None, serialization_alias="keyboardLayout"
     )
+    flags_key: str | None = Field(default=None, serialization_alias="flagsKey")
 
 
 class SummaryPage(BaseModel):
@@ -147,3 +179,31 @@ class ProfileStatsOut(BaseModel):
     wpm_history: list[WpmHistoryPointOut] = Field(serialization_alias="wpmHistory")
     key_accuracy: dict[str, int] = Field(serialization_alias="keyAccuracy")
     key_trends: dict[str, list[int]] = Field(serialization_alias="keyTrends")
+
+
+class PublicUserOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    username: str
+    display_name: str = Field(serialization_alias="displayName")
+
+
+class LeaderboardEntry(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    rank: int
+    username: str
+    display_name: str = Field(serialization_alias="displayName")
+    wpm: int
+    accuracy: int
+    score: float
+    date: int
+
+
+class LeaderboardOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    entries: list[LeaderboardEntry]
+    your_entry: LeaderboardEntry | None = Field(
+        default=None, serialization_alias="yourEntry"
+    )

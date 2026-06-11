@@ -42,11 +42,14 @@ export type RunSummary = {
   keyboardId?: string;
   keyboardName?: string;
   keyboardLayout?: KeyboardLayout;
+  flagsKey?: string;
 };
 
 export type RunFilters = {
   keyboardId?: string;
   layout?: KeyboardLayout;
+  flagsKey?: string;
+  mode?: Mode;
 };
 
 export type ProfileSummary = {
@@ -75,6 +78,36 @@ export type ProfileStats = {
   keyAccuracy: Record<string, number>;
   keyTrends: Record<string, number[]>;
 };
+
+export type LeaderboardEntry = {
+  rank: number;
+  username: string;
+  displayName: string;
+  wpm: number;
+  accuracy: number;
+  score: number;
+  date: number;
+};
+
+export type LeaderboardResponse = {
+  entries: LeaderboardEntry[];
+  yourEntry: LeaderboardEntry | null;
+};
+
+export type LeaderboardTimeframe = "all_time" | "monthly";
+
+export type LeaderboardBucket = {
+  mode: "time" | "words";
+  value: number;
+  label: string;
+};
+
+export const LEADERBOARD_BUCKETS: LeaderboardBucket[] = [
+  { mode: "time", value: 15, label: "15s" },
+  { mode: "time", value: 30, label: "30s" },
+  { mode: "time", value: 60, label: "60s" },
+  { mode: "words", value: 25, label: "25w" },
+];
 
 type SummaryPage = {
   runs: RunSummary[];
@@ -274,6 +307,8 @@ function filtersQuery(filters?: RunFilters): string {
   const params = new URLSearchParams();
   if (filters.keyboardId) params.set("keyboardId", filters.keyboardId);
   if (filters.layout) params.set("layout", filters.layout);
+  if (filters.flagsKey) params.set("flagsKey", filters.flagsKey);
+  if (filters.mode) params.set("mode", filters.mode);
   const qs = params.toString();
   return qs ? `&${qs}` : "";
 }
@@ -298,6 +333,8 @@ export async function fetchProfileStats(
   const params = new URLSearchParams();
   if (filters?.keyboardId) params.set("keyboardId", filters.keyboardId);
   if (filters?.layout) params.set("layout", filters.layout);
+  if (filters?.flagsKey) params.set("flagsKey", filters.flagsKey);
+  if (filters?.mode) params.set("mode", filters.mode);
   const qs = params.toString();
   const res = await apiFetch(`/runs/profile-stats${qs ? `?${qs}` : ""}`);
   if (!res.ok) throw new Error("Failed to load profile stats");
@@ -377,6 +414,21 @@ export async function deleteKeyboard(id: string): Promise<void> {
     method: "DELETE",
   });
   if (!res.ok) throw new Error("Failed to delete keyboard");
+}
+
+export async function fetchLeaderboard(
+  mode: "time" | "words",
+  value: number,
+  timeframe: LeaderboardTimeframe = "all_time"
+): Promise<LeaderboardResponse> {
+  const params = new URLSearchParams({
+    mode,
+    value: String(value),
+    timeframe,
+  });
+  const res = await apiFetch(`/runs/leaderboard?${params.toString()}`);
+  if (!res.ok) throw new Error("Failed to load leaderboard");
+  return (await res.json()) as LeaderboardResponse;
 }
 
 export async function fetchRunById(id: string): Promise<RunRecord> {

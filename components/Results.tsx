@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { isRunPending, subscribeRunPending } from "@/lib/sync";
 import { canReplay } from "@/lib/replay";
+import { labelForFlagsKey } from "@/lib/contentFlags";
 import { layoutLabel } from "@/lib/keyboards";
 import type { CaretStyle } from "@/lib/types";
 import type { TestResult } from "@/lib/useTypingTest";
@@ -80,17 +81,19 @@ export default function Results({
   const syncing = !historical && runPending;
 
   const modeLabel =
-    record.mode === "time"
+    record.mode === "practice"
+      ? `${record.value}s practice`
+      : record.mode === "time"
       ? `${record.value}s`
       : record.mode === "words"
       ? `${record.value} words`
       : "quote";
 
   return (
-    <div className="flex flex-col gap-8 w-full">
-      <div className="grid gap-10 md:grid-cols-[300px_1fr] items-center w-full">
-        {/* hero — vertically centered against the chart */}
-        <div className="pop flex flex-col">
+    <div className="results-panel flex flex-col gap-8 w-full">
+      <div className="grid gap-10 md:grid-cols-[300px_1fr] md:items-start items-center w-full">
+        {/* hero — aligned to top on wider screens for clearer nav separation */}
+        <div className="pop results-hero flex flex-col">
           <div className="flex items-center gap-2.5 mb-4 flex-wrap">
             <span className="text-dim text-[11px] uppercase tracking-[0.2em]">
               {modeLabel}
@@ -110,6 +113,11 @@ export default function Results({
                 ★ best
               </span>
             )}
+            {record.flagsKey && record.flagsKey !== "base" && record.mode !== "quote" && (
+              <span className="history-run-badge text-[10px] uppercase tracking-[0.14em] px-2 py-1 rounded-md">
+                {labelForFlagsKey(record.flagsKey)}
+              </span>
+            )}
             {syncing && (
               <span className="sync-run-badge text-[10px] uppercase tracking-[0.14em] px-2 py-1 rounded-md">
                 Syncing to server…
@@ -127,7 +135,7 @@ export default function Results({
 
           <div className="flex items-end gap-3 -ml-1">
             <span
-              className="stat-num text-accent"
+              className="results-hero-wpm stat-num text-accent"
               style={{ fontSize: "clamp(84px, 12vw, 132px)" }}
             >
               {record.wpm}
@@ -138,7 +146,7 @@ export default function Results({
           </div>
 
           <div className="flex items-baseline gap-2 mt-2">
-            <span className="stat-num" style={{ fontSize: 44 }}>
+            <span className="results-hero-acc stat-num" style={{ fontSize: 44 }}>
               {record.accuracy}
               <span className="text-dim text-xl">%</span>
             </span>

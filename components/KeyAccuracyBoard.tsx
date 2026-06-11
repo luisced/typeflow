@@ -94,6 +94,38 @@ function TrendChart({ data }: { data: number[] }) {
   );
 }
 
+function KeyAccuracyKeyButton({
+  ch,
+  pct,
+  selected,
+  onSelect,
+}: {
+  ch: string;
+  pct: number | undefined;
+  selected: string | null;
+  onSelect: (ch: string) => void;
+}) {
+  const keyName = ch === " " ? "space" : ch;
+  const label =
+    pct !== undefined ? `${keyName} key — ${pct}% accuracy` : `${keyName} key`;
+  const isSelected = selected === ch;
+  const isSpace = ch === " ";
+
+  return (
+    <button
+      type="button"
+      className={`kbd-key${isSpace ? " kbd-space" : ""}${isSelected ? " kbd-key-selected" : ""}`}
+      style={accuracyStyle(pct)}
+      aria-label={label}
+      title={pct !== undefined ? `${pct}% accuracy` : undefined}
+      aria-pressed={isSelected}
+      onClick={() => onSelect(ch)}
+    >
+      {!isSpace && <span>{keyDisplay(ch)}</span>}
+    </button>
+  );
+}
+
 export default function KeyAccuracyBoard({
   keyAccuracy,
   keyTrends,
@@ -111,31 +143,6 @@ export default function KeyAccuracyBoard({
   const trend = selected ? keyTrends[selected] : undefined;
   const current = selected ? keyAccuracy[selected] : undefined;
   const hasTrend = trend !== undefined && trend.length >= 2;
-
-  const KeyButton = ({ ch }: { ch: string }) => {
-    const pct = keyAccuracy[ch];
-    const keyName = ch === " " ? "space" : ch;
-    const label =
-      pct !== undefined
-        ? `${keyName} key — ${pct}% accuracy`
-        : `${keyName} key`;
-    const isSelected = selected === ch;
-    const isSpace = ch === " ";
-
-    return (
-      <button
-        type="button"
-        className={`kbd-key${isSpace ? " kbd-space" : ""}${isSelected ? " kbd-key-selected" : ""}`}
-        style={accuracyStyle(pct)}
-        aria-label={label}
-        title={pct !== undefined ? `${pct}% accuracy` : undefined}
-        aria-pressed={isSelected}
-        onClick={() => setSelected(ch)}
-      >
-        {!isSpace && <span>{keyDisplay(ch)}</span>}
-      </button>
-    );
-  };
 
   const renderTrendPanel = () => {
     if (loading) {
@@ -208,11 +215,22 @@ export default function KeyAccuracyBoard({
         {rows.map((row, ri) => (
           <div key={ri} className="flex gap-2" style={{ marginLeft: ri * 20 }}>
             {row.map((ch, ci) => (
-              <KeyButton key={`${ri}-${ci}-${ch}`} ch={ch} />
+              <KeyAccuracyKeyButton
+                key={`${ri}-${ci}-${ch}`}
+                ch={ch}
+                pct={keyAccuracy[ch]}
+                selected={selected}
+                onSelect={setSelected}
+              />
             ))}
           </div>
         ))}
-        <KeyButton ch=" " />
+        <KeyAccuracyKeyButton
+          ch=" "
+          pct={keyAccuracy[" "]}
+          selected={selected}
+          onSelect={setSelected}
+        />
       </div>
       <div className="key-trend-panel">{renderTrendPanel()}</div>
     </div>

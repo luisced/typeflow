@@ -9,11 +9,16 @@ import {
   EngineState,
 } from "./engine";
 import {
+  initialPracticeWords,
   initialQuote,
   initialSampleWords,
+  practiceSampleWords,
   randomQuote,
   sampleWords,
 } from "./content";
+import { maybeStoreGhostPb } from "./ghost";
+import { flagsKeyForMode, normalizeContentFlags } from "./contentFlags";
+import { targetKeysForPractice, weaknessForChar } from "./weakness";
 import {
   computeAccuracy,
   computeConsistency,
@@ -28,16 +33,30 @@ import type { RunRecord, TestConfig, KeyEvent } from "./types";
 
 type Phase = "idle" | "running" | "finished" | "paused";
 
+function practiceWords(config: TestConfig): string[] {
+  const flags = normalizeContentFlags(config.flags);
+  const history = loadHistory();
+  const targets = targetKeysForPractice(history);
+  const score = (ch: string) => weaknessForChar(ch, history);
+  return practiceSampleWords(60, targets, score, flags);
+}
+
 function buildWords(config: TestConfig): string[] {
   if (config.mode === "quote") return randomQuote();
-  if (config.mode === "words") return sampleWords(config.value);
-  return sampleWords(60); // time mode: seed, extended on demand
+  if (config.mode === "practice") return practiceWords(config);
+  const flags = normalizeContentFlags(config.flags);
+  if (config.mode === "words") return sampleWords(config.value, flags);
+  return sampleWords(60, flags); // time mode: seed, extended on demand
 }
 
 function buildInitialWords(config: TestConfig): string[] {
   if (config.mode === "quote") return initialQuote();
-  if (config.mode === "words") return initialSampleWords(config.value);
-  return initialSampleWords(60);
+  if (config.mode === "practice") {
+    return initialPracticeWords(60, normalizeContentFlags(config.flags));
+  }
+  const flags = normalizeContentFlags(config.flags);
+  if (config.mode === "words") return initialSampleWords(config.value, flags);
+  return initialSampleWords(60, flags);
 }
 
 export interface TestResult {
@@ -111,8 +130,21 @@ export function useTypingTest(config: TestConfig) {
       const accuracy = computeAccuracy(finalEngine);
       const consistency = computeConsistency(samplesRef.current);
 
+      const flags = normalizeContentFlags(config.flags);
+      const flagsKey = flagsKeyForMode(config.mode, flags);
       const history = loadHistory();
-      const prevBest = personalBest(history, config.mode, config.value);
+      const prevBest = personalBest(
+        history,
+        config.mode,
+        config.value,
+        undefined,
+        flagsKey
+      );
+
+      const practiceTargets =
+        config.mode === "practice"
+          ? targetKeysForPractice(loadHistory())
+          : undefined;
 
       const record: RunRecord = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -131,14 +163,24 @@ export function useTypingTest(config: TestConfig) {
         errorSeconds: errorSecondsRef.current.slice(),
         keyLog: keylogRef.current.slice(),
         words: finalEngine.words.slice(),
+        flags,
+        flagsKey,
+        ...(config.mode === "practice"
+          ? {
+              isComparable: false,
+              practice: { targetKeys: practiceTargets },
+            }
+          : {}),
         ...(getActiveKeyboardId()
           ? { keyboardId: getActiveKeyboardId() }
           : {}),
       };
+      const isPB = wpm > prevBest && wpm > 0;
       saveRun(record);
+      maybeStoreGhostPb(record, isPB);
       queueRun(record.id);
       void syncNow();
-      setResult({ record, isPB: wpm > prevBest && wpm > 0, prevBest });
+      setResult({ record, isPB, prevBest });
       setPhase("finished");
     },
     [config]
@@ -182,7 +224,10 @@ export function useTypingTest(config: TestConfig) {
         lastSampleSec.current = whole;
       }
 
-      if (config.mode === "time" && sec >= config.value) {
+      if (
+        (config.mode === "time" || config.mode === "practice") &&
+        sec >= config.value
+      ) {
         cancelAnimationFrame(rafRef.current!);
         finish(engineRef.current, config.value);
         return;
@@ -219,10 +264,14 @@ export function useTypingTest(config: TestConfig) {
       let next = applied;
       // keep an endless stream for time mode
       if (
-        config.mode === "time" &&
+        (config.mode === "time" || config.mode === "practice") &&
         next.wordIndex >= next.words.length - 10
       ) {
-        next = appendWords(next, sampleWords(30));
+        const more =
+          config.mode === "practice"
+            ? practiceWords(config).slice(0, 30)
+            : sampleWords(30, normalizeContentFlags(config.flags));
+        next = appendWords(next, more);
       }
 
       if (next !== prev) {
@@ -265,7 +314,12 @@ export function useTypingTest(config: TestConfig) {
 
   // finish word/quote runs once the engine reports completion
   useEffect(() => {
-    if (phase !== "running" || !engine.finished || config.mode === "time")
+    if (
+      phase !== "running" ||
+      !engine.finished ||
+      config.mode === "time" ||
+      config.mode === "practice"
+    )
       return;
     const dur = startRef.current
       ? (performance.now() - startRef.current) / 1000
@@ -282,7 +336,9 @@ export function useTypingTest(config: TestConfig) {
   }, []);
 
   const remaining =
-    config.mode === "time" ? Math.max(0, config.value - elapsed) : null;
+    config.mode === "time" || config.mode === "practice"
+      ? Math.max(0, config.value - elapsed)
+      : null;
 
   return {
     engine,

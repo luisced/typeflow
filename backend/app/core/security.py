@@ -85,3 +85,11 @@ async def current_user_id(
     if user_id is None:
         raise _unauthorized
     return user_id
+
+
+async def optional_user_id(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> uuid.UUID | None:
+    if creds is None:
+        return None
+    return decode_access_token(creds.credentials)

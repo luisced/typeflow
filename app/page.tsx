@@ -14,6 +14,21 @@ import { isOnline } from "@/lib/network";
 import { loadHistory, mergeHistory } from "@/lib/storage";
 import { syncNow } from "@/lib/sync";
 import { useTypingTest, type TestResult } from "@/lib/useTypingTest";
+import { loadContentFlags, saveContentFlags } from "@/lib/contentFlags";
+import { correctChars } from "@/lib/engine";
+import {
+  charsAhead,
+  ensureGhostForConfig,
+  ghostAccuracy as ghostTraceAccuracy,
+  ghostCorrectAt,
+  ghostMatchesQuote,
+  ghostMistakeActive,
+  ghostMistakesAt,
+  ghostPositionAt,
+  loadGhostEnabled,
+  saveGhostEnabled,
+} from "@/lib/ghost";
+import { targetKeysForPractice } from "@/lib/weakness";
 import type { CaretStyle, TestConfig } from "@/lib/types";
 import { useTheme } from "@/lib/useTheme";
 
@@ -22,10 +37,15 @@ const CARET_KEY = "typeflow.caret.v1";
 function HomePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [config, setConfig] = useState<TestConfig>({ mode: "time", value: 30 });
+  const [config, setConfig] = useState<TestConfig>(() => ({
+    mode: "time",
+    value: 30,
+    flags: loadContentFlags(),
+  }));
   const [historyResult, setHistoryResult] = useState<TestResult | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [ghostEnabled, setGhostEnabled] = useState(() => loadGhostEnabled());
   const [caretStyle, setCaretStyle] = useState<CaretStyle>(() => {
     try {
       const saved = window.localStorage.getItem(CARET_KEY) as CaretStyle | null;
@@ -71,6 +91,7 @@ function HomePage() {
   const changeConfig = useCallback(
     (c: TestConfig) => {
       setConfig(c);
+      if (c.flags) saveContentFlags(c.flags);
       test.reset(c);
     },
     [test]
@@ -221,6 +242,41 @@ function HomePage() {
     config.mode === "quote" ? test.engine.words.length : config.value
   }`;
 
+  const ghostForConfig =
+    config.mode !== "practice" ? ensureGhostForConfig(config) : null;
+  const ghostTrace = ghostEnabled ? ghostForConfig : null;
+  const ghostActive =
+    ghostTrace &&
+    ghostMatchesQuote(ghostTrace, test.engine.words) &&
+    (config.mode !== "quote" || ghostTrace.quoteText === test.engine.words.join(" "));
+  const ghostCaret =
+    ghostActive && test.phase === "running"
+      ? ghostPositionAt(test.engine, ghostTrace, test.elapsed)
+      : null;
+  const ghostAhead =
+    ghostActive && test.phase === "running"
+      ? charsAhead(
+          correctChars(test.engine),
+          ghostCorrectAt(ghostTrace, test.elapsed)
+        )
+      : null;
+  const ghostAccuracy = ghostActive ? ghostTraceAccuracy(ghostTrace) : null;
+  const ghostMistakes =
+    ghostActive && test.phase === "running"
+      ? ghostMistakesAt(ghostTrace, test.elapsed)
+      : null;
+  const ghostStumble =
+    ghostActive && test.phase === "running"
+      ? ghostMistakeActive(ghostTrace, test.elapsed)
+      : false;
+
+  const practiceTargets =
+    config.mode === "practice" ? targetKeysForPractice(loadHistory()) : [];
+  const practiceIdleHint =
+    practiceTargets.length > 0
+      ? `targeting: ${practiceTargets.map((k) => `\`${k === " " ? "space" : k}\``).join(" ")}`
+      : "type a few normal tests first — no weak keys yet";
+
   const activeResult =
     historyResult ?? (test.phase === "finished" ? test.result : null);
   const showResults = !!activeResult;
@@ -232,7 +288,11 @@ function HomePage() {
   if (!loggedIn) return <AuthGate />;
 
   return (
-    <main className="app-shell relative z-10 min-h-dvh flex flex-col px-6 md:px-10 py-7 max-w-[1080px] mx-auto w-full">
+    <main
+      className={`app-shell relative z-10 min-h-dvh flex flex-col px-6 md:px-10 py-7 max-w-[1080px] mx-auto w-full${
+        showResults ? " app-shell--results" : ""
+      }`}
+    >
       <div
         className="topbar-wrap shrink-0"
         data-hidden={test.phase === "running"}
@@ -242,16 +302,30 @@ function HomePage() {
           config={config}
           onChange={changeConfig}
           onOpenProfile={() => router.push("/profile")}
+          onOpenLeaderboard={() => router.push("/leaderboard")}
           onGoHome={goHome}
           disabled={test.phase === "running"}
           caretStyle={caretStyle}
           onCaretStyle={changeCaretStyle}
+          ghostEnabled={ghostEnabled}
+          onGhostToggle={(on) => {
+            setGhostEnabled(on);
+            saveGhostEnabled(on);
+          }}
+          ghostWpm={ghostForConfig?.wpm ?? null}
+          ghostAccuracy={ghostForConfig ? ghostTraceAccuracy(ghostForConfig) : null}
           dark={dark}
           onToggleTheme={toggleTheme}
         />
       </div>
 
-      <section className="flex min-h-0 flex-1 flex-col justify-center gap-8 -mt-6">
+      <section
+        className={
+          showResults
+            ? "results-section flex min-h-0 flex-1 flex-col gap-8"
+            : "flex min-h-0 flex-1 flex-col justify-center gap-8 -mt-6"
+        }
+      >
           {historyLoading ? (
             <div className="flex flex-col items-center gap-3 text-dim text-sm" aria-busy="true">
               <span className="history-loading-spinner" aria-hidden />
@@ -283,6 +357,9 @@ function HomePage() {
                 elapsed={test.elapsed}
                 progress={progress}
                 visible={test.phase === "running" || test.phase === "paused"}
+                ghostAhead={ghostActive ? ghostAhead : null}
+                ghostAccuracy={ghostActive ? ghostAccuracy : null}
+                ghostMistakes={ghostActive ? ghostMistakes : null}
               />
 
               <div
@@ -294,13 +371,15 @@ function HomePage() {
                   engine={test.engine}
                   running={test.phase === "running"}
                   caretStyle={caretStyle}
+                  ghostCaret={ghostActive ? ghostCaret : null}
+                  ghostStumble={ghostStumble}
                 />
               </div>
 
               <div className="flex justify-center">
                 <span className="text-dim text-xs tracking-wide">
                   {test.phase === "idle" ? (
-                    "start typing to begin"
+                    config.mode === "practice" ? practiceIdleHint : "start typing to begin"
                   ) : (
                     <>
                       <kbd>tab</kbd> restart

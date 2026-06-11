@@ -112,6 +112,32 @@ describe("personalBest", () => {
     ];
     expect(personalBest(history, "quote", 0)).toBe(88);
   });
+
+  it("buckets PB by flagsKey for time mode", () => {
+    const history = [
+      makeRun({ mode: "time", value: 30, wpm: 70, flagsKey: "base" }),
+      makeRun({ mode: "time", value: 30, wpm: 90, flagsKey: "c,n" }),
+      makeRun({ mode: "time", value: 30, wpm: 85, flagsKey: "c,n" }),
+    ];
+    expect(personalBest(history, "time", 30, undefined, "c,n")).toBe(90);
+    expect(personalBest(history, "time", 30, undefined, "base")).toBe(70);
+  });
+
+  it("excludes non-comparable runs from PB", () => {
+    const history = [
+      makeRun({ mode: "time", value: 30, wpm: 99, isComparable: false }),
+      makeRun({ mode: "time", value: 30, wpm: 80 }),
+    ];
+    expect(personalBest(history, "time", 30)).toBe(80);
+  });
+
+  it("quote PB ignores flagsKey on stored runs", () => {
+    const history = [
+      makeRun({ mode: "quote", value: 0, wpm: 70, flagsKey: "c" }),
+      makeRun({ mode: "quote", value: 0, wpm: 82, flagsKey: "n,p" }),
+    ];
+    expect(personalBest(history, "quote", 0, undefined, "c,n,p")).toBe(82);
+  });
 });
 
 describe("mergeHistory", () => {

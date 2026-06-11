@@ -233,6 +233,13 @@ export default function ActivityHeatmap({ dailyStats, loading }: Props) {
     </div>
   );
 
+  const scrollRegion = (
+    <div className="activity-heatmap-scroll-shell">
+      <div className="activity-heatmap-scroll">{grid}</div>
+      <p className="activity-heatmap-scroll-hint">Swipe horizontally for the full year</p>
+    </div>
+  );
+
   const title = (
     <div className="activity-heatmap-header">
       <h3 className="activity-heatmap-title">Activity</h3>
@@ -252,15 +259,17 @@ export default function ActivityHeatmap({ dailyStats, loading }: Props) {
         {title}
         <div className="activity-heatmap-body">
           <div className="activity-heatmap-main">
-            <div className="activity-heatmap-scroll" aria-hidden="true">
-              <div className="activity-heatmap-skeleton hm-weeks">
-                {Array.from({ length: WEEKS }).map((_, wi) => (
-                  <div key={wi} className="hm-week-col">
-                    {Array.from({ length: DAYS }).map((_, di) => (
-                      <div key={di} className="hm-cell hm-skeleton" />
-                    ))}
-                  </div>
-                ))}
+            <div className="activity-heatmap-scroll-shell">
+              <div className="activity-heatmap-scroll" aria-hidden="true">
+                <div className="activity-heatmap-skeleton hm-weeks">
+                  {Array.from({ length: WEEKS }).map((_, wi) => (
+                    <div key={wi} className="hm-week-col">
+                      {Array.from({ length: DAYS }).map((_, di) => (
+                        <div key={di} className="hm-cell hm-skeleton" />
+                      ))}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -280,7 +289,7 @@ export default function ActivityHeatmap({ dailyStats, loading }: Props) {
 
       <div className="activity-heatmap-body">
         <div className="activity-heatmap-main">
-          <div className="activity-heatmap-scroll">{grid}</div>
+          {scrollRegion}
 
           {isEmpty && (
             <p className="activity-heatmap-empty">

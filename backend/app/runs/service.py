@@ -33,13 +33,56 @@ def _dt_to_ms(dt: datetime) -> int:
     return int(as_utc(dt).timestamp() * 1000)
 
 
+def _run_flags_key(run: Run) -> str:
+    detail = run.detail or {}
+    return detail.get("flagsKey") or "base"
+
+
+def _filter_by_flags_key(runs: list[Run], flags_key: str | None) -> list[Run]:
+    if flags_key is None:
+        return runs
+    return [r for r in runs if _run_flags_key(r) == flags_key]
+
+
+def _filter_by_mode(runs: list[Run], mode: str | None) -> list[Run]:
+    if mode is None:
+        return runs
+    return [r for r in runs if r.mode == mode]
+
+
+def _comparable_for_profile(runs: list[Run]) -> list[Run]:
+    """Exclude practice and explicitly non-comparable runs from default aggregates."""
+    return [
+        r
+        for r in runs
+        if r.mode != "practice"
+        and (r.detail or {}).get("isComparable", True) is not False
+    ]
+
+
 def _keyboard_name(run: Run) -> str | None:
     if run.keyboard is not None:
         return run.keyboard.name
     return None
 
 
+def _v2_detail_fields(detail: dict) -> dict:
+    out: dict = {}
+    if "flagsKey" in detail:
+        out["flags_key"] = detail["flagsKey"]
+    if detail.get("flags") is not None:
+        out["flags"] = detail["flags"]
+    if detail.get("practice") is not None:
+        out["practice"] = detail["practice"]
+    if detail.get("ghost") is not None:
+        out["ghost"] = detail["ghost"]
+    if "isComparable" in detail:
+        out["is_comparable"] = detail["isComparable"]
+    return out
+
+
 def _to_summary(run: Run) -> RunSummaryOut:
+    detail = run.detail or {}
     return RunSummaryOut(
         id=run.client_id,
         mode=run.mode,
@@ -52,6 +95,7 @@ def _to_summary(run: Run) -> RunSummaryOut:
         keyboard_id=run.keyboard_id,
         keyboard_name=_keyboard_name(run),
         keyboard_layout=run.keyboard_layout,
+        flags_key=detail.get("flagsKey"),
     )
 
 
@@ -78,6 +122,7 @@ def _to_out(run: Run) -> RunOut:
         keyboard_id=run.keyboard_id,
         keyboard_name=_keyboard_name(run),
         keyboard_layout=run.keyboard_layout,
+        **_v2_detail_fields(detail),
     )
 
 
@@ -128,6 +173,39 @@ async def push_batch(
                     "errorSeconds": r.error_seconds,
                     "keyLog": r.key_log,
                     "words": r.words,
+                    **(
+                        {"flagsKey": r.flags_key}
+                        if r.flags_key is not None
+                        else {}
+                    ),
+                    **(
+                        {"flags": r.flags.model_dump()}
+                        if r.flags is not None
+                        else {}
+                    ),
+                    **(
+                        {
+                            "practice": r.practice.model_dump(
+                                by_alias=True, exclude_none=True
+                            )
+                        }
+                        if r.practice is not None
+                        else {}
+                    ),
+                    **(
+                        {
+                            "ghost": r.ghost.model_dump(
+                                by_alias=True, exclude_none=True
+                            )
+                        }
+                        if r.ghost is not None
+                        else {}
+                    ),
+                    **(
+                        {"isComparable": r.is_comparable}
+                        if r.is_comparable is not None
+                        else {}
+                    ),
                 },
                 keyboard_id=keyboard_id,
                 keyboard_layout=keyboard_layout,
@@ -159,11 +237,13 @@ async def summary_page(
     *,
     keyboard_id: uuid.UUID | None = None,
     layout: str | None = None,
+    flags_key: str | None = None,
 ) -> SummaryPage:
     user = await auth_repo.get_user_by_id(db, user_id)
     rows = await repo.page_after(
         db, user_id, after, limit, keyboard_id=keyboard_id, layout=layout
     )
+    rows = _filter_by_flags_key(rows, flags_key)
     return SummaryPage(
         runs=[_to_summary(r) for r in rows],
         next_after=rows[-1].seq if rows else after,
@@ -204,10 +284,15 @@ async def profile_stats(
     *,
     keyboard_id: uuid.UUID | None = None,
     layout: str | None = None,
+    flags_key: str | None = None,
+    mode: str | None = None,
 ) -> ProfileStatsOut:
     runs = await repo.all_for_user(
         db, user_id, keyboard_id=keyboard_id, layout=layout
     )
+    runs = _filter_by_flags_key(runs, flags_key)
+    runs = _filter_by_mode(runs, mode)
+    runs = _comparable_for_profile(runs)
 
     if not runs:
         return ProfileStatsOut(

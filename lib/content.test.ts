@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   QUOTES,
+  applyContentFlags,
   initialQuote,
   initialSampleWords,
   randomQuote,
@@ -63,6 +64,47 @@ describe("quotes", () => {
     expect(initialQuote().join(" ")).toBe(QUOTES[0]);
   });
 
+  it("randomQuote is unchanged by content flags (quotes ignore flags)", () => {
+    const words = randomQuote();
+    expect(QUOTES).toContain(words.join(" "));
+  });
+});
+
+describe("applyContentFlags", () => {
+  it("returns a copy when all flags are off", () => {
+    const words = ["the", "quick", "brown"];
+    expect(applyContentFlags(words, {})).toEqual(words);
+  });
+
+  it("capitalizes the first word when capitals is enabled", () => {
+    const out = applyContentFlags(["the", "end."], { capitals: true, numbers: false, punctuation: false });
+    expect(out[0][0]).toBe(out[0][0].toUpperCase());
+  });
+
+  it("adds punctuation to some words at scale", () => {
+    const words = sampleWords(500, {
+      punctuation: true,
+      numbers: false,
+      capitals: false,
+    });
+    const punctuated = words.filter((w) => /[.,!?;:]$/.test(w) || /^["(]/.test(w));
+    expect(punctuated.length).toBeGreaterThan(50);
+    expect(punctuated.length).toBeLessThan(250);
+  });
+
+  it("replaces some words with numbers at scale", () => {
+    const words = sampleWords(500, {
+      punctuation: false,
+      numbers: true,
+      capitals: false,
+    });
+    const numeric = words.filter((w) => /\d/.test(w));
+    expect(numeric.length).toBeGreaterThan(10);
+    expect(numeric.length).toBeLessThan(100);
+  });
+});
+
+describe("quote stream shape", () => {
   it("all bundled quotes are typable single-space word streams", () => {
     for (const q of QUOTES) {
       expect(q).not.toMatch(/\s{2}/); // no double spaces

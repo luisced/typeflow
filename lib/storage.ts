@@ -1,3 +1,4 @@
+import { flagsKeyForMode } from "./contentFlags";
 import type { RunRecord } from "./types";
 
 const KEY = "typeflow.history.v1";
@@ -52,24 +53,33 @@ export function replaceHistory(runs: RunRecord[]): RunRecord[] {
   return history;
 }
 
+function runFlagsKey(run: RunRecord): string {
+  return run.flagsKey ?? flagsKeyForMode(run.mode, run.flags);
+}
+
 /**
- * Personal best WPM for a given mode+value, excluding the given run id.
- * Quote mode has no meaningful `value` (quotes vary in length), so all
- * quote runs share one PB bucket regardless of stored value.
+ * Personal best WPM for a given mode+value+flagsKey, excluding the given run id.
+ * Quote mode ignores value and flags (one shared bucket). Non-comparable runs
+ * (e.g. practice) are never counted toward PB.
  */
 export function personalBest(
   history: RunRecord[],
   mode: string,
   value: number,
-  excludeId?: string
+  excludeId?: string,
+  flagsKey = "base"
 ): number {
+  const bucketKey = mode === "quote" ? "base" : flagsKey;
+
   return history
-    .filter(
-      (r) =>
-        r.mode === mode &&
-        (mode === "quote" || r.value === value) &&
-        r.id !== excludeId
-    )
+    .filter((r) => {
+      if (r.id === excludeId) return false;
+      if (r.isComparable === false) return false;
+      if (r.mode !== mode) return false;
+      if (mode === "quote") return true;
+      if (r.value !== value) return false;
+      return runFlagsKey(r) === bucketKey;
+    })
     .reduce((best, r) => Math.max(best, r.wpm), 0);
 }
 

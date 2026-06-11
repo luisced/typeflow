@@ -7,12 +7,15 @@ import ChartHelp from "@/components/ChartHelp";
 import KeyboardFilterBar from "@/components/KeyboardFilterBar";
 import KeyboardSettings from "@/components/KeyboardSettings";
 import KeyAccuracyBoard from "@/components/KeyAccuracyBoard";
+import ProfileProgressFilters from "@/components/ProfileProgressFilters";
 import RunHistoryList from "@/components/RunHistoryList";
 import WpmProgressChart from "@/components/WpmProgressChart";
 import TopBar from "@/components/TopBar";
 import { attemptSilentRefresh, fetchProfileStats, type ProfileStats, type RunFilters } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { resolveKeyAccuracyLayout } from "@/lib/keyboards";
+import { localProgressSummary } from "@/lib/progress";
+import { loadHistory } from "@/lib/storage";
 import { useKeyboards } from "@/lib/useKeyboards";
 import { useTheme } from "@/lib/useTheme";
 
@@ -104,7 +107,26 @@ export default function ProfilePage() {
       const data = await fetchProfileStats(filters);
       if (!cancelled()) setStats(data);
     } catch {
-      if (!cancelled()) setError(true);
+      if (!cancelled()) {
+        setError(true);
+        const local = localProgressSummary(loadHistory(), {
+          mode: filters.mode,
+          flagsKey: filters.flagsKey,
+        });
+        setStats({
+          summary: {
+            bestWpm: local.bestWpm,
+            avgWpm: local.avgWpm,
+            avgAccuracy: local.avgAccuracy,
+            totalRuns: local.totalRuns,
+            totalTimeSec: local.totalTimeSec,
+          },
+          dailyStats: [],
+          wpmHistory: [],
+          keyAccuracy: {},
+          keyTrends: {},
+        });
+      }
     } finally {
       if (!cancelled()) setLoading(false);
     }
@@ -133,6 +155,10 @@ export default function ProfilePage() {
   }, [router, load, reloadKey]);
 
   const summary = stats?.summary;
+  const localExtras = localProgressSummary(loadHistory(), {
+    mode: filters.mode,
+    flagsKey: filters.flagsKey,
+  });
   const memberSince = user ? formatMemberSince(user.createdAt) : "";
   const keyAccuracyLayout = resolveKeyAccuracyLayout(filters, keyboards);
 
@@ -149,6 +175,7 @@ export default function ProfilePage() {
           variant="profile"
           onGoHome={() => router.push("/")}
           onOpenProfile={() => router.push("/profile")}
+          onOpenLeaderboard={() => router.push("/leaderboard")}
           dark={dark}
           onToggleTheme={toggleTheme}
         />
@@ -164,6 +191,7 @@ export default function ProfilePage() {
         <div className="profile-bento-top">
           <div className="profile-filter-strip">
             <KeyboardFilterBar filters={filters} onChange={setFilters} />
+            <ProfileProgressFilters filters={filters} onChange={setFilters} />
           </div>
           <div className="profile-bento-card profile-user-hero">
             <div className="profile-avatar" aria-hidden>
@@ -178,54 +206,79 @@ export default function ProfilePage() {
               </p>
             </div>
           </div>
-          <StatCard
-            label="Best WPM"
-            value={summary?.bestWpm ?? "—"}
-            accent
-            loading={loading}
-            helpLabel="What is best WPM?"
-            help={
-              <>
-                Your highest <strong>words per minute</strong> from any single
-                completed test.
-              </>
-            }
-          />
-          <StatCard
-            label="Avg WPM"
-            value={summary?.avgWpm ?? "—"}
-            loading={loading}
-            helpLabel="What is average WPM?"
-            help={
-              <>
-                The mean WPM across <strong>all</strong> your completed tests.
-              </>
-            }
-          />
-          <StatCard
-            label="Accuracy"
-            value={summary ? `${summary.avgAccuracy}%` : "—"}
-            loading={loading}
-            helpLabel="What is accuracy?"
-            help={
-              <>
-                Average percentage of correct keystrokes across every completed
-                test.
-              </>
-            }
-          />
-          <StatCard
-            label="Total Runs"
-            value={summary?.totalRuns ?? "—"}
-            loading={loading}
-            helpLabel="What are total runs?"
-            help={
-              <>
-                How many typing tests you&apos;ve finished and saved to your
-                account.
-              </>
-            }
-          />
+          <div className="profile-stats-grid">
+            <StatCard
+              label="Best WPM"
+              value={summary?.bestWpm ?? "—"}
+              accent
+              loading={loading}
+              helpLabel="What is best WPM?"
+              help={
+                <>
+                  Your highest <strong>words per minute</strong> from any single
+                  completed test.
+                </>
+              }
+            />
+            <StatCard
+              label="Avg WPM"
+              value={summary?.avgWpm ?? "—"}
+              loading={loading}
+              helpLabel="What is average WPM?"
+              help={
+                <>
+                  The mean WPM across <strong>all</strong> your completed tests.
+                </>
+              }
+            />
+            <StatCard
+              label="Accuracy"
+              value={summary ? `${summary.avgAccuracy}%` : "—"}
+              loading={loading}
+              helpLabel="What is accuracy?"
+              help={
+                <>
+                  Average percentage of correct keystrokes across every completed
+                  test.
+                </>
+              }
+            />
+            <StatCard
+              label="Total Runs"
+              value={summary?.totalRuns ?? "—"}
+              loading={loading}
+              helpLabel="What are total runs?"
+              help={
+                <>
+                  How many typing tests you&apos;ve finished and saved to your
+                  account.
+                </>
+              }
+            />
+            <StatCard
+              label="Streak"
+              value={localExtras.currentStreak > 0 ? `${localExtras.currentStreak}d` : "—"}
+              loading={loading}
+              helpLabel="What is streak?"
+              help={
+                <>
+                  Consecutive days with at least one completed test (from local
+                  history).
+                </>
+              }
+            />
+            <StatCard
+              label="Volume"
+              value={
+                localExtras.totalTimeSec > 0
+                  ? `${Math.round(localExtras.totalTimeSec / 60)}m`
+                  : "—"
+              }
+              loading={loading}
+              helpLabel="What is volume?"
+              help={<>Total typing time across filtered runs.</>}
+            />
+          </div>
         </div>
 
         <div className="profile-bento-card profile-keyboard-card">

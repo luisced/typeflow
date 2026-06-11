@@ -6,7 +6,7 @@ import KeyboardFilterBar from "@/components/KeyboardFilterBar";
 import { fetchRunSummaries, getAccessToken, type RunFilters, type RunSummary } from "@/lib/api";
 import { layoutLabel } from "@/lib/keyboards";
 import { isOnline } from "@/lib/network";
-import { filterSummaries, modeLabel, summariesFromLocal } from "@/lib/runDisplay";
+import { filterSummaries, flagsLabel, modeLabel, summariesFromLocal } from "@/lib/runDisplay";
 import { clearAllHistory } from "@/lib/sync";
 
 interface Props {
@@ -51,6 +51,12 @@ function RunRow({
         <span>{run.accuracy}%</span>
         <span>·</span>
         <span>{modeLabel(run)}</span>
+        {flagsLabel(run) && (
+          <>
+            <span>·</span>
+            <span>{flagsLabel(run)}</span>
+          </>
+        )}
         <span>·</span>
         <span>{run.consistency}%</span>
         {(run.keyboardName || run.keyboardLayout) && (

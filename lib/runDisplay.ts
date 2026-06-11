@@ -1,12 +1,19 @@
 import type { RunSummary } from "@/lib/api";
+import { labelForFlagsKey } from "@/lib/contentFlags";
 import { loadHistory } from "@/lib/storage";
 
 export function modeLabel(r: { mode: string; value: number }): string {
+  if (r.mode === "practice") return "practice";
   return r.mode === "time"
     ? `${r.value}s`
     : r.mode === "words"
       ? `${r.value}w`
       : "quote";
+}
+
+export function flagsLabel(r: { mode: string; flagsKey?: string }): string | null {
+  if (r.mode === "quote" || !r.flagsKey || r.flagsKey === "base") return null;
+  return labelForFlagsKey(r.flagsKey);
 }
 
 export function summariesFromLocal(): RunSummary[] {
@@ -22,6 +29,7 @@ export function summariesFromLocal(): RunSummary[] {
     keyboardId: r.keyboardId,
     keyboardName: r.keyboardName,
     keyboardLayout: r.keyboardLayout,
+    flagsKey: r.flagsKey,
   }));
 }
 
