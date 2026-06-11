@@ -1,29 +1,81 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { charStates, EngineState } from "@/lib/engine";
+import { measureLineStride } from "@/lib/typingLayout";
 import type { CaretStyle } from "@/lib/types";
-import { computeCaretBox, type CaretMetrics } from "./caretGeometry";
+import {
+  caretHorizontalInset,
+  computeCaretBox,
+  type CaretMetrics,
+} from "./caretGeometry";
+import { caretMotionStyle } from "./caretMotion";
 
 interface Props {
   engine: EngineState;
   running: boolean;
   caretStyle?: CaretStyle;
+  ghostCaret?: { wordIndex: number; charIndex: number } | null;
+  ghostStumble?: boolean;
 }
 
 const VISIBLE_LINES = 3;
+
+function useReducedMotion(): boolean {
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (!query) return;
+
+    setReducedMotion(query.matches);
+    const onChange = () => setReducedMotion(query.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+
+  return reducedMotion;
+}
+
+function AnimatedCaret({
+  box,
+  className,
+  caretStyle,
+  ghostStumble,
+}: {
+  box: ReturnType<typeof computeCaretBox>;
+  className: string;
+  caretStyle: CaretStyle;
+  ghostStumble?: boolean;
+}) {
+  return (
+    <span
+      className={className}
+      data-style={caretStyle}
+      data-stumble={ghostStumble ? "true" : undefined}
+      style={caretMotionStyle(box)}
+    />
+  );
+}
 
 export default function TypingArea({
   engine,
   running,
   caretStyle = "line",
+  ghostCaret = null,
+  ghostStumble = false,
 }: Props) {
   const clipRef = useRef<HTMLDivElement>(null); // fixed-height clip
   const innerRef = useRef<HTMLDivElement>(null); // translated vertically
   const caretTargetRef = useRef<HTMLSpanElement>(null);
   const [caret, setCaret] = useState<CaretMetrics | null>(null);
+  const [ghostCaretMetrics, setGhostCaretMetrics] = useState<CaretMetrics | null>(
+    null
+  );
   const [scrollY, setScrollY] = useState(0);
   const [lineH, setLineH] = useState(0);
+  const [viewportVersion, setViewportVersion] = useState(0);
+  const reducedMotion = useReducedMotion();
 
   const { words, typed, wordIndex } = engine;
   const activeCharIndex = (typed[wordIndex] ?? "").length;
@@ -34,14 +86,18 @@ export default function TypingArea({
   const end = Math.min(words.length, Math.max(80, wordIndex + 40));
   const view = words.slice(0, end);
 
+  useEffect(() => {
+    const onResize = () => setViewportVersion((v) => v + 1);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   useLayoutEffect(() => {
     const inner = innerRef.current;
     if (!inner) return;
 
     // Batched read of every word's vertical position.
     const wordEls = inner.querySelectorAll<HTMLElement>(".type-word");
-    const tops: number[] = [];
-    wordEls.forEach((el) => tops.push(el.offsetTop));
 
     // Locate the active character cell directly from the DOM (do NOT rely on a
     // React ref — it can lag the active position during fast typing).
@@ -55,17 +111,7 @@ export default function TypingArea({
     const charH = cell.offsetHeight; // glyph line box (for caret centering)
     const activeTop = activeWordEl.offsetTop;
 
-    // The real line stride includes the word's margin — derive it from the
-    // distinct row positions (char offsetHeight alone is too small).
-    const distinct = [...new Set(tops)].sort((a, b) => a - b);
-    let stride = charH * 1.25;
-    for (let i = 1; i < distinct.length; i++) {
-      const d = distinct[i] - distinct[i - 1];
-      if (d > 4) {
-        stride = d;
-        break;
-      }
-    }
+    const stride = measureLineStride(wordEls, cell);
 
     setLineH(stride);
     setCaret({
@@ -75,6 +121,32 @@ export default function TypingArea({
       glyph: fontPx,
       cell: fontPx * 0.6, // JetBrains Mono advance width
     });
+
+    if (ghostCaret) {
+      const ghostWordEl = wordEls[ghostCaret.wordIndex];
+      if (ghostWordEl) {
+        const ghostCells = ghostWordEl.querySelectorAll<HTMLElement>(".type-char");
+        const ghostCell =
+          ghostCells[
+            Math.min(ghostCaret.charIndex, Math.max(0, ghostCells.length - 1))
+          ];
+        if (ghostCell) {
+          setGhostCaretMetrics({
+            left: ghostWordEl.offsetLeft + ghostCell.offsetLeft,
+            lineTop: ghostWordEl.offsetTop,
+            lineBoxH: ghostCell.offsetHeight,
+            glyph: parseFloat(getComputedStyle(ghostCell).fontSize) || fontPx,
+            cell: fontPx * 0.6,
+          });
+        } else {
+          setGhostCaretMetrics(null);
+        }
+      } else {
+        setGhostCaretMetrics(null);
+      }
+    } else {
+      setGhostCaretMetrics(null);
+    }
 
     // Keep one completed line above the active line; scroll by whole lines.
     const activeLineIndex = Math.round(activeTop / stride);
@@ -89,15 +161,27 @@ export default function TypingArea({
         el.style.transformOrigin = "";
       }
     });
-  }, [wordIndex, activeCharIndex, words, typed]);
+  }, [wordIndex, activeCharIndex, words, typed, ghostCaret, viewportVersion]);
 
   const caretBox = caret ? computeCaretBox(caret, caretStyle) : null;
+  const ghostCaretBox = ghostCaretMetrics
+    ? computeCaretBox(ghostCaretMetrics, caretStyle)
+    : null;
 
   return (
     <div
       ref={clipRef}
       className="type-clip relative overflow-hidden select-none"
-      style={{ height: lineH ? lineH * VISIBLE_LINES : "clamp(168px, 20.4vw, 240px)" }}
+      style={
+        lineH
+          ? {
+              height: lineH * VISIBLE_LINES,
+              ...(caret
+                ? { paddingLeft: caretHorizontalInset(caret.glyph) }
+                : {}),
+            }
+          : undefined
+      }
       aria-hidden
     >
       <div
@@ -105,19 +189,24 @@ export default function TypingArea({
         className="relative will-change-transform"
         style={{
           transform: `translateY(${-scrollY}px)`,
-          transition: "transform 0.18s cubic-bezier(0.22,0.8,0.28,1)",
+          transition: reducedMotion
+            ? "none"
+            : "transform 0.18s cubic-bezier(0.22,0.8,0.28,1)",
         }}
       >
+        {ghostCaretBox && (
+          <AnimatedCaret
+            box={ghostCaretBox}
+            className="caret caret-ghost"
+            caretStyle={caretStyle}
+            ghostStumble={ghostStumble}
+          />
+        )}
         {caretBox && (
-          <span
+          <AnimatedCaret
+            box={caretBox}
             className={`caret ${running ? "" : "blink"}`}
-            data-style={caretStyle}
-            style={{
-              left: caretBox.left,
-              top: caretBox.top,
-              width: caretBox.width,
-              height: caretBox.height,
-            }}
+            caretStyle={caretStyle}
           />
         )}
         {view.map((word, wi) => {

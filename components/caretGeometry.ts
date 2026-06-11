@@ -3,6 +3,11 @@ import type { CaretStyle } from "@/lib/types";
 export const UNDERLINE_CARET_TEXT_GAP_PX = 2;
 export const BAR_CARET_TEXT_GAP_PX = 2;
 
+/** Horizontal inset so line-style carets aren't clipped at the start of a row. */
+export function caretHorizontalInset(glyph: number): number {
+  return Math.max(4, glyph * 0.1) + BAR_CARET_TEXT_GAP_PX;
+}
+
 export interface CaretMetrics {
   left: number;
   lineTop: number;
