@@ -17,6 +17,7 @@ services:
   api:
     build:
       context: ../backend
+      dockerfile: ../docker/Dockerfile
     restart: unless-stopped
     depends_on:
       postgres:

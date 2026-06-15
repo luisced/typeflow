@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { login, register } from "@/lib/api";
+import { NetworkError, login, register } from "@/lib/api";
 import {
   DISPLAY_NAME_MAX,
   PASSWORD_MAX,
@@ -39,6 +39,7 @@ export default function AuthGate() {
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>(EMPTY_ERRORS);
   const [apiError, setApiError] = useState("");
+  const [networkError, setNetworkError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const firstFieldRef = useRef<HTMLInputElement>(null);
@@ -100,6 +101,7 @@ export default function AuthGate() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setApiError("");
+    setNetworkError("");
     const errors = validateAuthForm(
       { identifier, email, password, username, displayName },
       mode
@@ -131,7 +133,11 @@ export default function AuthGate() {
       setPassword("");
       setFieldErrors(EMPTY_ERRORS);
     } catch (err) {
-      setApiError(err instanceof Error ? err.message : "Something went wrong");
+      if (err instanceof NetworkError) {
+        setNetworkError(err.message);
+      } else {
+        setApiError(err instanceof Error ? err.message : "Something went wrong");
+      }
     } finally {
       setBusy(false);
     }
@@ -141,6 +147,7 @@ export default function AuthGate() {
     setMode((m) => (m === "login" ? "register" : "login"));
     setFieldErrors(EMPTY_ERRORS);
     setApiError("");
+    setNetworkError("");
   };
 
   return (
@@ -173,6 +180,17 @@ export default function AuthGate() {
               </p>
             </div>
 
+            {networkError && (
+              <div className="auth-network-error" role="alert">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden style={{ flexShrink: 0, marginTop: 1 }}>
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                <span>{networkError}</span>
+              </div>
+            )}
+
             <form onSubmit={submit} className="auth-card-form" noValidate>
               {mode === "login" ? (
                 <div className="auth-field">
@@ -189,6 +207,7 @@ export default function AuthGate() {
                       setIdentifier(e.target.value);
                       clearFieldError("identifier");
                       setApiError("");
+                      setNetworkError("");
                     }}
                     onBlur={() => validateField("identifier")}
                     required
@@ -216,6 +235,7 @@ export default function AuthGate() {
                       setEmail(e.target.value);
                       clearFieldError("email");
                       setApiError("");
+                      setNetworkError("");
                     }}
                     onBlur={() => validateField("email")}
                     required
