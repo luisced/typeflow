@@ -7,11 +7,18 @@ if (-not (Test-Path $EnvFile)) {
     exit 1
 }
 
-# Read ports from env file, fall back to defaults
-$ApiPort = (Select-String -Path $EnvFile -Pattern '^API_PORT=(.+)').Matches.Groups[1].Value.Trim()
-$WebPort = (Select-String -Path $EnvFile -Pattern '^WEB_PORT=(.+)').Matches.Groups[1].Value.Trim()
-if (-not $ApiPort) { $ApiPort = "8000" }
-if (-not $WebPort) { $WebPort = "3000" }
+# Read a var from the env file — active line takes priority, then commented line.
+function Read-EnvVar($key, $default) {
+    $lines = Get-Content $EnvFile
+    $active = $lines | Where-Object { $_ -match "^${key}=(.+)" } | Select-Object -Last 1
+    if ($active -match "^${key}=(.+)") { return $Matches[1].Trim() }
+    $commented = $lines | Where-Object { $_ -match "^#\s*${key}=(.+)" } | Select-Object -Last 1
+    if ($commented -match "^#\s*${key}=(.+)") { return $Matches[1].Trim() }
+    return $default
+}
+
+$ApiPort = Read-EnvVar "API_PORT" "8000"
+$WebPort = Read-EnvVar "WEB_PORT" "3000"
 
 function Test-PortInUse($port) {
     $connections = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
@@ -20,15 +27,17 @@ function Test-PortInUse($port) {
 
 if (Test-PortInUse $ApiPort) {
     Write-Host "Error: port $ApiPort (API_PORT) is already in use."
-    Write-Host "Change API_PORT in $EnvFile and re-run."
+    Write-Host "Set API_PORT=$ApiPort in $EnvFile (uncomment the line) and change it, then re-run."
     exit 1
 }
 
 if (Test-PortInUse $WebPort) {
     Write-Host "Error: port $WebPort (WEB_PORT) is already in use."
-    Write-Host "Change WEB_PORT in $EnvFile and re-run."
+    Write-Host "Set WEB_PORT=$WebPort in $EnvFile (uncomment the line) and change it, then re-run."
     exit 1
 }
 
-docker compose -f docker/docker-compose.yml --env-file $EnvFile up -d --build
+docker compose -f docker/docker-compose.yml --env-file $EnvFile `
+    -e API_PORT=$ApiPort -e WEB_PORT=$WebPort `
+    up -d --build
 Write-Host "TypeFlow is up. Frontend -> http://localhost:$WebPort  API -> http://localhost:$ApiPort"
