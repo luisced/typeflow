@@ -5,6 +5,16 @@ import type { Keyboard, KeyboardLayout, Mode, RunRecord } from "./types";
 export const API_URL =
   process.env.NEXT_PUBLIC_TYPEFLOW_API_URL ?? "http://localhost:8000";
 
+export class NetworkError extends Error {
+  constructor() {
+    super(
+      `Cannot reach the API at ${API_URL}. ` +
+        `If self-hosting, verify NEXT_PUBLIC_TYPEFLOW_API_URL and TYPEFLOW_CORS_ORIGINS are configured correctly.`
+    );
+    this.name = "NetworkError";
+  }
+}
+
 let accessToken: string | null = null;
 let refreshInFlight: Promise<boolean> | null = null;
 
@@ -191,11 +201,17 @@ export async function apiFetch(
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers,
-    credentials: authPaths(path) ? "include" : init.credentials ?? "same-origin",
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...init,
+      headers,
+      credentials: authPaths(path) ? "include" : init.credentials ?? "same-origin",
+    });
+  } catch (err) {
+    if (err instanceof TypeError) throw new NetworkError();
+    throw err;
+  }
 
   if (res.status === 401 && !retried && !path.startsWith("/auth/refresh")) {
     const ok = await refreshAccessToken();

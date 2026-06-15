@@ -6,8 +6,10 @@ import { getUser, subscribe } from "@/lib/auth";
 import {
   formatLastSyncedAt,
   getLastSyncedAt,
+  getSyncError,
   getSyncStatus,
   subscribeLastSyncedAt,
+  subscribeSyncError,
   subscribeSyncStatus,
   syncStatusLabel,
   type SyncStatus,
@@ -71,6 +73,7 @@ export default function AccountMenu({ onOpenProfile }: AccountMenuProps) {
   const [user, setUser] = useState(getUser);
   const [syncStatus, setSyncStatus] = useState(getSyncStatus);
   const [lastSyncedAt, setLastSyncedAt] = useState(getLastSyncedAt);
+  const [syncError, setSyncError] = useState(getSyncError);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [, setTick] = useState(0);
@@ -79,6 +82,7 @@ export default function AccountMenu({ onOpenProfile }: AccountMenuProps) {
   useEffect(() => subscribe(() => setUser(getUser())), []);
   useEffect(() => subscribeSyncStatus(setSyncStatus), []);
   useEffect(() => subscribeLastSyncedAt(setLastSyncedAt), []);
+  useEffect(() => subscribeSyncError(setSyncError), []);
 
   useEffect(() => {
     if (!open) return;
@@ -154,6 +158,11 @@ export default function AccountMenu({ onOpenProfile }: AccountMenuProps) {
             <p className="account-last-sync text-[10px]">
               Last sync from server: {formatLastSyncedAt(lastSyncedAt)}
             </p>
+            {syncStatus === "error" && syncError && (
+              <p className="text-[10px] mt-1" style={{ color: "var(--error)" }}>
+                {syncError}
+              </p>
+            )}
           </div>
           <div className="account-menu-actions">
             <button

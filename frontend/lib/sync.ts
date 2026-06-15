@@ -45,10 +45,12 @@ type PendingListener = () => void;
 let status: SyncStatus = "idle";
 let lastSyncedAt: number | null = null;
 let lastPullStats: LoginSyncResult | null = null;
+let syncError: string | null = null;
 const statusListeners = new Set<SyncListener>();
 const lastSyncListeners = new Set<LastSyncListener>();
 const mergeListeners = new Set<() => void>();
 const pendingListeners = new Set<PendingListener>();
+const errorListeners = new Set<(e: string | null) => void>();
 
 function notifyPending() {
   pendingListeners.forEach((cb) => cb());
@@ -66,6 +68,21 @@ export function subscribeRunPending(cb: PendingListener): () => void {
 function setStatus(next: SyncStatus) {
   status = next;
   statusListeners.forEach((cb) => cb(next));
+}
+
+function setSyncError(err: string | null) {
+  syncError = err;
+  errorListeners.forEach((cb) => cb(err));
+}
+
+export function getSyncError(): string | null {
+  return syncError;
+}
+
+export function subscribeSyncError(cb: (e: string | null) => void): () => void {
+  errorListeners.add(cb);
+  cb(syncError);
+  return () => errorListeners.delete(cb);
 }
 
 export function getSyncStatus(): SyncStatus {
@@ -277,8 +294,10 @@ export async function syncNow(): Promise<void> {
     await pushPending();
     await pullAndMerge();
     setLastSyncedAt(Date.now());
+    setSyncError(null);
     setStatus("synced");
-  } catch {
+  } catch (err) {
+    setSyncError(err instanceof Error ? err.message : "Unknown sync error");
     setStatus("error");
   }
 }
