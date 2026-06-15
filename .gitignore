@@ -9,8 +9,6 @@ out/
 # env / secrets
 .env
 .env.docker
-frontend/.env.local
-frontend/.env*.local
 
 # python
 __pycache__/
