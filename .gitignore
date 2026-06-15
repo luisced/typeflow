@@ -8,7 +8,6 @@ out/
 
 # env / secrets
 .env
-.env.docker
 
 # python
 __pycache__/
