@@ -27,6 +27,7 @@ tsconfig.tsbuildinfo
 # tooling
 .claude/
 .superpowers/
+docs/superpowers/
 
 # os
 .DS_Store

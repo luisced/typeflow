@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "dev:backend": "make -C backend dev",
-    "dev:docker": "make -C backend docker-dev-d",
+    "dev:backend": "make -C ../backend dev",
+    "dev:docker": "make -C ../backend docker-dev-d",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
