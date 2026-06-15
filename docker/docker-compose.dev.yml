@@ -1,14 +1,14 @@
 # Dev overlay: bind-mount app code + uvicorn --reload.
-# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env.docker up --build
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file ../backend/.env.docker up --build
 
 services:
   api:
     env_file:
-      - .env.docker
+      - ../backend/.env.docker
     environment:
       TYPEFLOW_RELOAD: "true"
       # Docker Desktop on macOS often needs polling for reliable file watches.
       WATCHFILES_FORCE_POLLING: "true"
     volumes:
-      - ./app:/app/app
-      - ./alembic:/app/alembic
+      - ../backend/app:/app/app
+      - ../backend/alembic:/app/alembic

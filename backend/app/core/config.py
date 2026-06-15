@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     ]
     cookie_secure: bool = True
     rate_limit_enabled: bool = True
+    registration_open: bool = True
     log_level: str = "INFO"
     log_color: bool = True
     log_access: bool = True

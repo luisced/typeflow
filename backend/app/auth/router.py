@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import service
@@ -48,6 +48,11 @@ async def register(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
+    if not settings.registration_open:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Registration is closed on this instance",
+        )
     user, access, refresh_raw = await service.register(
         db, body.email, body.username, body.display_name, body.password
     )
