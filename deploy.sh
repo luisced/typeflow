@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-ENV_FILE="backend/.env.docker"
-EXAMPLE="backend/.env.docker.example"
+ENV_FILE=".env.docker"
+EXAMPLE=".env.docker.example"
 
 if [ ! -f "$ENV_FILE" ]; then
   cp "$EXAMPLE" "$ENV_FILE"

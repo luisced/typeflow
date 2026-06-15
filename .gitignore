@@ -7,10 +7,10 @@ node_modules/
 out/
 
 # env / secrets
+.env
+.env.docker
 frontend/.env.local
 frontend/.env*.local
-backend/.env
-backend/.env.docker
 
 # python
 __pycache__/

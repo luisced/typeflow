@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     log_access: bool = True
     log_exclude_paths: list[str] = ["/healthz"]
 
-    model_config = {"env_prefix": "TYPEFLOW_", "env_file": ".env"}
+    model_config = {"env_prefix": "TYPEFLOW_", "env_file": ("../.env", ".env")}
 
     def jwt_secret_is_weak(self) -> bool:
         return self.jwt_secret in _WEAK_JWT_SECRETS or len(self.jwt_secret) < 32

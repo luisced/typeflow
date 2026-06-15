@@ -1,6 +1,6 @@
 .PHONY: sync dev docker-dev docker-dev-d docker-prod test migrate upgrade
 
-COMPOSE_DEV = -f ../docker/docker-compose.yml -f ../docker/docker-compose.dev.yml --env-file .env.docker
+COMPOSE_DEV = -f ../docker/docker-compose.yml -f ../docker/docker-compose.dev.yml --env-file ../.env.docker
 
 sync:
 	uv sync
@@ -15,7 +15,7 @@ docker-dev-d:
 	docker compose $(COMPOSE_DEV) up -d --build
 
 docker-prod:
-	docker compose -f ../docker/docker-compose.yml --env-file .env.docker up -d --build
+	docker compose -f ../docker/docker-compose.yml --env-file ../.env.docker up -d --build
 
 test:
 	uv run pytest -q

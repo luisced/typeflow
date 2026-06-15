@@ -1,5 +1,5 @@
-$EnvFile = "backend\.env.docker"
-$Example = "backend\.env.docker.example"
+$EnvFile = ".env.docker"
+$Example = ".env.docker.example"
 
 if (-not (Test-Path $EnvFile)) {
     Copy-Item $Example $EnvFile
