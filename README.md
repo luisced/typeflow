@@ -25,15 +25,19 @@ cd typeflow
 
 **Linux / macOS**
 ```bash
-./deploy.sh
+./deploy.sh --pull    # prebuilt images from GHCR (recommended)
+./deploy.sh           # or build locally from this checkout
 ```
 
 **Windows (PowerShell)**
 ```powershell
-.\deploy.ps1
+.\deploy.ps1 -Pull    # prebuilt images from GHCR (recommended)
+.\deploy.ps1          # or build locally from this checkout
 ```
 
 The first run copies `.env.example` → `.env` and exits so you can fill in the required values. Edit the file and run the script again.
+
+Prebuilt images are multi-arch (`amd64` + `arm64`, so Raspberry Pi works) and published on every release: [`typeflow-api`](https://github.com/luisced/typeflow/pkgs/container/typeflow-api) and [`typeflow-web`](https://github.com/luisced/typeflow/pkgs/container/typeflow-web). Pin a version with `TYPEFLOW_VERSION=x.y.z` in `.env`.
 
 ```
 TypeFlow is up.
@@ -73,8 +77,14 @@ Optional fields (commented out in `.env.example` - uncomment to override the def
 ### Updating
 
 ```bash
+./deploy.sh --pull        # picks up the newest release images
+```
+
+Or when building locally:
+
+```bash
 git pull
-./deploy.sh        # or .\deploy.ps1 on Windows
+./deploy.sh
 ```
 
 The API container runs database migrations automatically on startup (`alembic upgrade head`), so no manual migration step is needed.

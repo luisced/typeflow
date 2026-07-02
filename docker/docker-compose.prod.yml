@@ -1,0 +1,63 @@
+# Production deploy from prebuilt GHCR images (no local build).
+# Pin a release with TYPEFLOW_VERSION in .env, or leave unset for latest.
+#
+#   docker compose -f docker/docker-compose.prod.yml --env-file .env up -d
+#
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: typeflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: typeflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U typeflow -d typeflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: ghcr.io/luisced/typeflow-api:${TYPEFLOW_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      TYPEFLOW_DATABASE_URL: postgresql+asyncpg://typeflow:${POSTGRES_PASSWORD:-change-me}@postgres:5432/typeflow
+      TYPEFLOW_JWT_SECRET: ${TYPEFLOW_JWT_SECRET:?set TYPEFLOW_JWT_SECRET}
+      TYPEFLOW_CORS_ORIGINS: ${TYPEFLOW_CORS_ORIGINS:-["http://localhost:3000"]}
+      TYPEFLOW_COOKIE_SECURE: ${TYPEFLOW_COOKIE_SECURE:-true}
+      TYPEFLOW_RATE_LIMIT_ENABLED: "true"
+      TYPEFLOW_ENV: production
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  web:
+    image: ghcr.io/luisced/typeflow-web:${TYPEFLOW_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    environment:
+      # Injected at container start into the prebuilt bundle (runtime config)
+      TYPEFLOW_API_URL: ${NEXT_PUBLIC_TYPEFLOW_API_URL:-http://localhost:8000}
+
+volumes:
+  pgdata:

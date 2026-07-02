@@ -10,6 +10,9 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Release builds pass the __TYPEFLOW_API_URL__ sentinel so the URL can be
+# swapped at container start (see docker-entrypoint.sh). Local compose builds
+# pass the real URL and the entrypoint no-ops.
 ARG NEXT_PUBLIC_TYPEFLOW_API_URL=http://localhost:8000
 ENV NEXT_PUBLIC_TYPEFLOW_API_URL=$NEXT_PUBLIC_TYPEFLOW_API_URL
 RUN corepack enable pnpm && pnpm build
@@ -21,8 +24,9 @@ RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --chown=nextjs:nodejs --chmod=755 docker-entrypoint.sh ./docker-entrypoint.sh
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-CMD ["node", "server.js"]
+ENTRYPOINT ["./docker-entrypoint.sh"]

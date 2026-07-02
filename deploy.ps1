@@ -1,5 +1,11 @@
+# Usage:
+#   .\deploy.ps1          build images locally from this checkout
+#   .\deploy.ps1 -Pull    pull prebuilt release images from GHCR
+param([switch]$Pull)
+
 $EnvFile = ".env"
 $Example = ".env.example"
+$ComposeFile = if ($Pull) { "docker/docker-compose.prod.yml" } else { "docker/docker-compose.yml" }
 
 if (-not (Test-Path $EnvFile)) {
     Copy-Item $Example $EnvFile
@@ -37,7 +43,10 @@ if (Test-PortInUse $WebPort) {
     exit 1
 }
 
-docker compose -f docker/docker-compose.yml --env-file $EnvFile `
-    -e API_PORT=$ApiPort -e WEB_PORT=$WebPort `
-    up -d --build
+if ($Pull) {
+    docker compose -f $ComposeFile --env-file $EnvFile pull
+    docker compose -f $ComposeFile --env-file $EnvFile up -d
+} else {
+    docker compose -f $ComposeFile --env-file $EnvFile up -d --build
+}
 Write-Host "TypeFlow is up. Frontend -> http://localhost:$WebPort  API -> http://localhost:$ApiPort"
