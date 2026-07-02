@@ -8,11 +8,16 @@
 
 ## Setup
 
+Copy the env file once at the project root - it's shared by the backend, frontend, and Docker Compose:
+
+```bash
+cp .env.example .env   # edit if needed - SQLite works out of the box
+```
+
 **Backend**
 
 ```bash
 cd backend
-cp .env.example .env        # edit if needed - SQLite works out of the box
 uv sync
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8000
@@ -22,7 +27,6 @@ uv run uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8000
 
 ```bash
 cd frontend
-cp .env.local.example .env.local   # adjust NEXT_PUBLIC_TYPEFLOW_API_URL if needed
 pnpm install
 pnpm dev
 ```
@@ -59,6 +63,22 @@ typeflow/
 │   └── lib/        Business logic, API client, hooks
 └── docker/       Dockerfiles and Compose files
 ```
+
+## Branch naming
+
+Branches follow `<type>(<scope>)/<short-description>`, kebab-case:
+
+```
+feat(auth)/guest-mode
+fix(leaderboard)/timezone-bug
+chore(deploy)/pin-pnpm-version
+docs(readme)/self-hosting-steps
+```
+
+`type` is one of `feat`, `fix`, `chore`, `docs`, `refactor`, `test`. `scope` is the
+area touched (`auth`, `runs`, `leaderboard`, `deploy`, `docker`, etc.) - omit it
+only when a change is truly cross-cutting. Keep `short-description` a few words,
+no issue numbers.
 
 ## Pull requests
 
