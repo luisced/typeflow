@@ -19,6 +19,8 @@ interface Props {
   historical?: boolean;
   onBack?: () => void;
   caretStyle?: CaretStyle;
+  /** Set for guest sessions — shows a local-only notice with a sign-in prompt. */
+  onSignIn?: () => void;
 }
 
 export default function Results({
@@ -28,6 +30,7 @@ export default function Results({
   historical,
   onBack,
   caretStyle,
+  onSignIn,
 }: Props) {
   const { record, isPB, prevBest } = result;
   const errors = Object.entries(record.errorMap);
@@ -78,7 +81,8 @@ export default function Results({
     onBack?.();
   };
 
-  const syncing = !historical && runPending;
+  const isGuest = !!onSignIn;
+  const syncing = !historical && runPending && !isGuest;
 
   const modeLabel =
     record.mode === "practice"
@@ -201,6 +205,20 @@ export default function Results({
               </button>
             )}
           </div>
+
+          {isGuest && !historical && (
+            <p className="guest-sync-nudge mt-4 text-left">
+              Saved on this device.{" "}
+              <button
+                type="button"
+                className="guest-sync-nudge-link"
+                onClick={onSignIn}
+              >
+                Sign in
+              </button>{" "}
+              to sync &amp; join the leaderboard.
+            </p>
+          )}
         </div>
 
         {/* chart + breakdown */}

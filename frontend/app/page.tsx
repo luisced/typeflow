@@ -57,9 +57,18 @@ function HomePage() {
   const hasSession = () => !!getUser();
   const [authChecked, setAuthChecked] = useState(hasSession);
   const [loggedIn, setLoggedIn] = useState(hasSession);
+  const [showAuth, setShowAuth] = useState(false);
   const { dark, toggle: toggleTheme } = useTheme();
 
-  useEffect(() => subscribe(() => setLoggedIn(hasSession())), []);
+  useEffect(
+    () =>
+      subscribe(() => {
+        const active = hasSession();
+        setLoggedIn(active);
+        if (active) setShowAuth(false);
+      }),
+    []
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -175,8 +184,10 @@ function HomePage() {
     };
   }, [loggedIn]);
 
+  const authGateVisible = !loggedIn && showAuth;
+
   useEffect(() => {
-    if (!loggedIn) return;
+    if (authGateVisible) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = testRef.current;
@@ -222,10 +233,10 @@ function HomePage() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [historyResult, loggedIn]);
+  }, [historyResult, authGateVisible]);
 
   useEffect(() => {
-    if (!loggedIn) return;
+    if (authGateVisible) return;
     const onBlur = () => testRef.current.pause();
     const onVisibility = () => {
       if (document.hidden) testRef.current.pause();
@@ -236,7 +247,7 @@ function HomePage() {
       window.removeEventListener("blur", onBlur);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [loggedIn]);
+  }, [authGateVisible]);
 
   const progress = `${test.engine.wordIndex}/${
     config.mode === "quote" ? test.engine.words.length : config.value
@@ -285,7 +296,9 @@ function HomePage() {
     return <div className="auth-boot" aria-busy="true" aria-label="Loading session" />;
   }
 
-  if (!loggedIn) return <AuthGate />;
+  if (!loggedIn && showAuth) {
+    return <AuthGate onClose={() => setShowAuth(false)} />;
+  }
 
   return (
     <main
@@ -303,6 +316,7 @@ function HomePage() {
           onChange={changeConfig}
           onOpenProfile={() => router.push("/profile")}
           onOpenLeaderboard={() => router.push("/leaderboard")}
+          onSignIn={() => setShowAuth(true)}
           onGoHome={goHome}
           disabled={test.phase === "running"}
           caretStyle={caretStyle}
@@ -346,6 +360,7 @@ function HomePage() {
               historical={!!historyResult}
               onBack={historyResult ? goHome : undefined}
               caretStyle={caretStyle}
+              onSignIn={loggedIn ? undefined : () => setShowAuth(true)}
             />
           ) : (
             <div className="relative left-1/2 -translate-x-1/2 w-[80vw] max-w-[1500px] flex flex-col gap-7">

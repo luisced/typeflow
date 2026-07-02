@@ -30,7 +30,7 @@ function FieldError({ id, message }: { id: string; message: string }) {
   );
 }
 
-export default function AuthGate() {
+export default function AuthGate({ onClose }: { onClose?: () => void }) {
   const [mode, setMode] = useState<"login" | "register">("register");
   const [identifier, setIdentifier] = useState("");
   const [email, setEmail] = useState("");
@@ -57,6 +57,15 @@ export default function AuthGate() {
   useEffect(() => {
     firstFieldRef.current?.focus();
   }, [mode]);
+
+  useEffect(() => {
+    if (!onClose) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   const clearFieldError = (field: AuthField) => {
     setFieldErrors((prev) => {
@@ -175,7 +184,7 @@ export default function AuthGate() {
               </h1>
               <p className="auth-card-sub">
                 {mode === "register"
-                  ? "Create your account to start typing."
+                  ? "Create an account to sync your runs across devices and join the leaderboard."
                   : "Sign in to your account."}
               </p>
             </div>
@@ -426,6 +435,16 @@ export default function AuthGate() {
             ? "Don't have an account? Register"
             : "Already have an account? Sign in"}
         </button>
+
+        {onClose && (
+          <button
+            type="button"
+            className="auth-guest-link"
+            onClick={onClose}
+          >
+            ← continue as guest
+          </button>
+        )}
       </main>
 
       <footer className="auth-page-footer rise" style={{ animationDelay: "0.2s" }}>

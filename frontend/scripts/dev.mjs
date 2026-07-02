@@ -8,7 +8,8 @@ import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const START_PORT = Number(process.env.PORT_START) || 3000;
+const START_PORT =
+  Number(process.env.PORT) || Number(process.env.PORT_START) || 3000;
 const MAX_TRIES = Number(process.env.PORT_TRIES) || 20;
 
 /** Probe the same way Next binds: dual-stack on all interfaces. */

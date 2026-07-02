@@ -67,9 +67,10 @@ const STATUS_COLOR: Record<SyncStatus, string> = {
 
 interface AccountMenuProps {
   onOpenProfile: () => void;
+  onSignIn?: () => void;
 }
 
-export default function AccountMenu({ onOpenProfile }: AccountMenuProps) {
+export default function AccountMenu({ onOpenProfile, onSignIn }: AccountMenuProps) {
   const [user, setUser] = useState(getUser);
   const [syncStatus, setSyncStatus] = useState(getSyncStatus);
   const [lastSyncedAt, setLastSyncedAt] = useState(getLastSyncedAt);
@@ -99,7 +100,14 @@ export default function AccountMenu({ onOpenProfile }: AccountMenuProps) {
     return () => window.clearInterval(id);
   }, [open]);
 
-  if (!user) return null;
+  if (!user) {
+    if (!onSignIn) return null;
+    return (
+      <button className="ghost" onClick={onSignIn}>
+        sign in
+      </button>
+    );
+  }
 
   const dotLabel = syncStatusLabel(syncStatus);
 

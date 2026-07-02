@@ -13,6 +13,7 @@ type BaseProps = {
   onOpenProfile: () => void;
   onGoHome: () => void;
   onOpenLeaderboard?: () => void;
+  onSignIn?: () => void;
   dark: boolean;
   onToggleTheme: (e: React.MouseEvent) => void;
 };
@@ -413,6 +414,7 @@ function CaretSettings({
 type ActionClusterProps = {
   onOpenProfile: () => void;
   onOpenLeaderboard?: () => void;
+  onSignIn?: () => void;
   dark: boolean;
   onToggleTheme: (e: React.MouseEvent) => void;
   caretStyle: CaretStyle;
@@ -435,6 +437,7 @@ type ActionClusterProps = {
 function ActionCluster({
   onOpenProfile,
   onOpenLeaderboard,
+  onSignIn,
   dark,
   onToggleTheme,
   caretStyle,
@@ -474,13 +477,15 @@ function ActionCluster({
       />
       <LeaderboardButton onClick={onOpenLeaderboard} />
       {showTheme && <ThemeToggle dark={dark} onToggleTheme={onToggleTheme} />}
-      {showAccount && <AccountMenu onOpenProfile={onOpenProfile} />}
+      {showAccount && (
+        <AccountMenu onOpenProfile={onOpenProfile} onSignIn={onSignIn} />
+      )}
     </div>
   );
 }
 
 export default function TopBar(props: Props) {
-  const { onOpenProfile, onGoHome, onOpenLeaderboard, dark, onToggleTheme } =
+  const { onOpenProfile, onGoHome, onOpenLeaderboard, onSignIn, dark, onToggleTheme } =
     props;
   const isProfile = props.variant === "profile";
 
@@ -534,7 +539,7 @@ export default function TopBar(props: Props) {
           <div className="flex items-center gap-2 shrink-0">
             <LeaderboardButton onClick={onOpenLeaderboard} />
             <ThemeToggle dark={dark} onToggleTheme={onToggleTheme} />
-            <AccountMenu onOpenProfile={onOpenProfile} />
+            <AccountMenu onOpenProfile={onOpenProfile} onSignIn={onSignIn} />
           </div>
         </div>
       </header>
@@ -570,6 +575,7 @@ export default function TopBar(props: Props) {
           className="topbar-actions-desktop"
           onOpenProfile={onOpenProfile}
           onOpenLeaderboard={onOpenLeaderboard}
+          onSignIn={onSignIn}
           dark={dark}
           onToggleTheme={onToggleTheme}
           caretStyle={caretStyle}
@@ -591,7 +597,7 @@ export default function TopBar(props: Props) {
             onClick={() => setMobileMenuOpen((o) => !o)}
           />
           <ThemeToggle dark={dark} onToggleTheme={onToggleTheme} />
-          <AccountMenu onOpenProfile={onOpenProfile} />
+          <AccountMenu onOpenProfile={onOpenProfile} onSignIn={onSignIn} />
         </div>
       </div>
 
