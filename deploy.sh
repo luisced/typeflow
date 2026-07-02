@@ -38,6 +38,5 @@ check_port "$API_PORT" "API_PORT"
 check_port "$WEB_PORT" "WEB_PORT"
 
 docker compose -f docker/docker-compose.yml --env-file "$ENV_FILE" \
-  -e API_PORT="$API_PORT" -e WEB_PORT="$WEB_PORT" \
   up -d --build
 echo "TypeFlow is up. Frontend -> http://localhost:${WEB_PORT}  API -> http://localhost:${API_PORT}"

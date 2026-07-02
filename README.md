@@ -33,7 +33,7 @@ cd typeflow
 .\deploy.ps1
 ```
 
-The first run copies `backend/.env.docker.example` → `backend/.env.docker` and exits so you can fill in the required values. Edit the file and run the script again.
+The first run copies `.env.example` → `.env` and exits so you can fill in the required values. Edit the file and run the script again.
 
 ```
 TypeFlow is up.
@@ -43,7 +43,7 @@ TypeFlow is up.
 
 ### Configuration
 
-All settings live in `backend/.env.docker`. Required fields:
+All settings live in a single `.env` file at the project root. Required fields:
 
 | Variable | Description |
 |---|---|
@@ -51,7 +51,7 @@ All settings live in `backend/.env.docker`. Required fields:
 | `TYPEFLOW_JWT_SECRET` | Random string ≥ 32 chars - generate with `openssl rand -hex 32` |
 | `TYPEFLOW_CORS_ORIGINS` | JSON array of allowed frontend origins |
 
-Optional fields:
+Optional fields (commented out in `.env.example` - uncomment to override the default):
 
 | Variable | Default | Description |
 |---|---|---|
@@ -64,7 +64,7 @@ Optional fields:
 
 ### Deploying on a domain
 
-1. Set `NEXT_PUBLIC_TYPEFLOW_API_URL=https://api.yourdomain.com` in `.env.docker`
+1. Set `NEXT_PUBLIC_TYPEFLOW_API_URL=https://api.yourdomain.com` in `.env`
 2. Set `TYPEFLOW_CORS_ORIGINS=["https://yourdomain.com"]`
 3. Set `TYPEFLOW_COOKIE_SECURE=true`
 4. Put a reverse proxy (Caddy, Nginx, Traefik) in front - the frontend runs on `WEB_PORT` and the API on `API_PORT`
@@ -82,7 +82,7 @@ The API container runs database migrations automatically on startup (`alembic up
 ### Stopping
 
 ```bash
-docker compose -f docker/docker-compose.yml --env-file backend/.env.docker down
+docker compose -f docker/docker-compose.yml --env-file .env down
 ```
 
 ---
