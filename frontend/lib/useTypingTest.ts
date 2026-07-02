@@ -9,6 +9,7 @@ import {
   EngineState,
 } from "./engine";
 import {
+  DEFAULT_LANGUAGE,
   initialPracticeWords,
   initialQuote,
   initialSampleWords,
@@ -38,25 +39,33 @@ function practiceWords(config: TestConfig): string[] {
   const history = loadHistory();
   const targets = targetKeysForPractice(history);
   const score = (ch: string) => weaknessForChar(ch, history);
-  return practiceSampleWords(60, targets, score, flags);
+  return practiceSampleWords(60, targets, score, flags, config.language);
 }
 
 function buildWords(config: TestConfig): string[] {
-  if (config.mode === "quote") return randomQuote();
+  if (config.mode === "quote") return randomQuote(config.language);
   if (config.mode === "practice") return practiceWords(config);
   const flags = normalizeContentFlags(config.flags);
-  if (config.mode === "words") return sampleWords(config.value, flags);
-  return sampleWords(60, flags); // time mode: seed, extended on demand
+  if (config.mode === "words") {
+    return sampleWords(config.value, flags, config.language);
+  }
+  return sampleWords(60, flags, config.language); // time mode: seed, extended on demand
 }
 
 function buildInitialWords(config: TestConfig): string[] {
-  if (config.mode === "quote") return initialQuote();
+  if (config.mode === "quote") return initialQuote(config.language);
   if (config.mode === "practice") {
-    return initialPracticeWords(60, normalizeContentFlags(config.flags));
+    return initialPracticeWords(
+      60,
+      normalizeContentFlags(config.flags),
+      config.language
+    );
   }
   const flags = normalizeContentFlags(config.flags);
-  if (config.mode === "words") return initialSampleWords(config.value, flags);
-  return initialSampleWords(60, flags);
+  if (config.mode === "words") {
+    return initialSampleWords(config.value, flags, config.language);
+  }
+  return initialSampleWords(60, flags, config.language);
 }
 
 export interface TestResult {
@@ -165,6 +174,7 @@ export function useTypingTest(config: TestConfig) {
         words: finalEngine.words.slice(),
         flags,
         flagsKey,
+        language: config.language ?? DEFAULT_LANGUAGE,
         ...(config.mode === "practice"
           ? {
               isComparable: false,
@@ -270,7 +280,7 @@ export function useTypingTest(config: TestConfig) {
         const more =
           config.mode === "practice"
             ? practiceWords(config).slice(0, 30)
-            : sampleWords(30, normalizeContentFlags(config.flags));
+            : sampleWords(30, normalizeContentFlags(config.flags), config.language);
         next = appendWords(next, more);
       }
 

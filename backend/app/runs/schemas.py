@@ -58,6 +58,8 @@ class RunIn(BaseModel):
     practice: PracticeMetaIn | None = None
     ghost: GhostMetaIn | None = None
     is_comparable: bool | None = Field(default=None, alias="isComparable")
+    # BCP 47 code of the content typed; absent means "en" (legacy runs)
+    language: str | None = Field(default=None, max_length=16)
 
 
 class RunOut(BaseModel):
@@ -100,6 +102,7 @@ class RunOut(BaseModel):
     is_comparable: bool | None = Field(
         default=None, serialization_alias="isComparable"
     )
+    language: str | None = None
 
 
 class BatchIn(BaseModel):

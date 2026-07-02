@@ -78,6 +78,8 @@ def _v2_detail_fields(detail: dict) -> dict:
         out["ghost"] = detail["ghost"]
     if "isComparable" in detail:
         out["is_comparable"] = detail["isComparable"]
+    if detail.get("language") is not None:
+        out["language"] = detail["language"]
     return out
 
 
@@ -206,6 +208,7 @@ async def push_batch(
                         if r.is_comparable is not None
                         else {}
                     ),
+                    **({"language": r.language} if r.language else {}),
                 },
                 keyboard_id=keyboard_id,
                 keyboard_layout=keyboard_layout,

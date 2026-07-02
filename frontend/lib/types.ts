@@ -33,6 +33,8 @@ export interface TestConfig {
   /** seconds for time mode, word count for words mode; ignored for quote */
   value: number;
   flags?: ContentFlags;
+  /** BCP 47 language code of the word/quote pack. Absent means "en". */
+  language?: string;
 }
 
 export type CharState = "correct" | "incorrect" | "extra" | "untyped";
@@ -76,6 +78,8 @@ export interface RunRecord {
   flags?: ContentFlags;
   /** Stable bucket for PB grouping, e.g. "base" or "c,n,p". */
   flagsKey?: string;
+  /** BCP 47 language code of the content typed. Absent means "en". */
+  language?: string;
   practice?: PracticeMeta;
   ghost?: GhostMeta;
   /** False for practice runs and other non-comparable sessions. */

@@ -49,6 +49,10 @@ def _is_qualifying(run: Run) -> bool:
     detail = run.detail or {}
     if detail.get("isComparable", True) is False:
         return False
+    # WPM is not comparable across languages; only English runs qualify
+    # until per-language boards exist. Absent means English (legacy runs).
+    if detail.get("language", "en") != "en":
+        return False
     return _run_flags_key(run) == "base"
 
 
