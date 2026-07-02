@@ -1,4 +1,13 @@
+from datetime import datetime, timedelta, timezone
+
 from tests.conftest import register_user
+
+# Relative to "now" so this stays inside the profile-stats 365-day window
+# regardless of when the suite runs (a hardcoded epoch previously expired).
+_NOW_MS = int(datetime.now(timezone.utc).timestamp() * 1000)
+_DAY_MS = int(timedelta(days=1).total_seconds() * 1000)
+_TWO_DAYS_AGO_MS = _NOW_MS - 2 * _DAY_MS
+_ONE_DAY_AGO_MS = _NOW_MS - _DAY_MS
 
 
 async def test_profile_stats_requires_auth(client):
@@ -13,7 +22,7 @@ async def test_profile_stats_aggregates_runs(client, make_run):
             wpm=100,
             accuracy=95,
             durationSec=60,
-            date=1_750_000_000_000,
+            date=_TWO_DAYS_AGO_MS,
             errorMap={"t": 2},
             keyMap={"t": 20, "h": 30},
         ),
@@ -22,7 +31,7 @@ async def test_profile_stats_aggregates_runs(client, make_run):
             wpm=120,
             accuracy=98,
             durationSec=45,
-            date=1_750_086_400_000,
+            date=_ONE_DAY_AGO_MS,
             errorMap={"t": 1},
             keyMap={"t": 15, "h": 25},
         ),
@@ -31,7 +40,7 @@ async def test_profile_stats_aggregates_runs(client, make_run):
             wpm=80,
             accuracy=90,
             durationSec=30,
-            date=1_750_000_000_000,
+            date=_TWO_DAYS_AGO_MS,
             errorMap={"g": 5},
             keyMap={},
         ),
