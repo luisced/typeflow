@@ -16,6 +16,7 @@ import { syncNow } from "@/lib/sync";
 import { useTypingTest, type TestResult } from "@/lib/useTypingTest";
 import { loadContentFlags, saveContentFlags } from "@/lib/contentFlags";
 import { correctChars } from "@/lib/engine";
+import { version as appVersion } from "../package.json";
 import {
   charsAhead,
   ensureGhostForConfig,
@@ -410,7 +411,7 @@ function HomePage() {
         className="flex shrink-0 items-center justify-between text-dim text-[11px] tracking-wide rise"
         style={{ animationDelay: "0.16s" }}
       >
-        <span>TypeFlow</span>
+        <span>TypeFlow · v{appVersion}</span>
         <span>
           <kbd>tab</kbd> restart · <kbd>esc</kbd> back · history syncs to your account
         </span>
