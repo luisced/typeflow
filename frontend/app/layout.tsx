@@ -22,6 +22,12 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "TypeFlow — typing test",
   description: "A tactile, minimalist typing test. Measure your keystrokes.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/favicon.png", type: "image/png", sizes: "64x64" },
+    ],
+  },
 };
 
 export default function RootLayout({

@@ -10,8 +10,10 @@ export type AuthField =
   | "email"
   | "username"
   | "displayName"
-  | "password";
+  | "password"
+  | "confirmPassword";
 export type AuthFieldErrors = Partial<Record<AuthField, string>>;
+export type PasswordStrength = "weak" | "fair" | "good" | "strong";
 
 const EMAIL_RE =
   /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
@@ -20,6 +22,10 @@ const USERNAME_RE = /^[a-zA-Z0-9_]+$/;
 export function validateIdentifier(identifier: string): string | null {
   if (!identifier.trim()) return "Email or username is required.";
   return null;
+}
+
+export function normalizeUsernameInput(username: string): string {
+  return username.toLowerCase();
 }
 
 export function validateEmail(email: string): string | null {
@@ -67,11 +73,75 @@ export function validatePassword(
   return null;
 }
 
+export function validateConfirmPassword(
+  password: string,
+  confirmPassword: string
+): string | null {
+  if (!confirmPassword) return "Please confirm your password.";
+  if (password !== confirmPassword) return "Passwords do not match.";
+  return null;
+}
+
+export function passwordStrengthChecks(
+  password: string,
+  context?: {
+    email?: string;
+    username?: string;
+    displayName?: string;
+  }
+): {
+  length: boolean;
+  mixedCase: boolean;
+  numberOrSymbol: boolean;
+  noPersonalInfo: boolean;
+} {
+  const lowered = password.toLowerCase();
+  const contextParts = [
+    context?.email?.trim().toLowerCase(),
+    context?.username?.trim().toLowerCase(),
+    context?.displayName?.trim().toLowerCase(),
+  ]
+    .filter((part): part is string => !!part)
+    .flatMap((part) => part.split(/[^a-z0-9]+/))
+    .filter((part) => part.length >= 3);
+
+  return {
+    length: password.length >= PASSWORD_MIN,
+    mixedCase:
+      /[a-z]/.test(password) &&
+      /[A-Z]/.test(password),
+    numberOrSymbol: /[0-9]/.test(password) || /[^A-Za-z0-9]/.test(password),
+    noPersonalInfo:
+      contextParts.length === 0 ||
+      contextParts.every((part) => !lowered.includes(part)),
+  };
+}
+
+export function passwordStrengthLabel(
+  password: string,
+  context?: {
+    email?: string;
+    username?: string;
+    displayName?: string;
+  }
+): PasswordStrength {
+  if (!password) return "weak";
+
+  const checks = passwordStrengthChecks(password, context);
+  const passed = Object.values(checks).filter(Boolean).length;
+
+  if (password.length >= 14 && passed === 4) return "strong";
+  if (passed >= 3) return "good";
+  if (passed >= 2) return "fair";
+  return "weak";
+}
+
 export function validateAuthForm(
   fields: {
     identifier?: string;
     email?: string;
     password: string;
+    confirmPassword?: string;
     username?: string;
     displayName?: string;
   },
@@ -89,8 +159,13 @@ export function validateAuthForm(
     if (emailError) errors.email = emailError;
     const usernameError = validateUsername(fields.username ?? "");
     const displayNameError = validateDisplayName(fields.displayName ?? "");
+    const confirmPasswordError = validateConfirmPassword(
+      fields.password,
+      fields.confirmPassword ?? ""
+    );
     if (usernameError) errors.username = usernameError;
     if (displayNameError) errors.displayName = displayNameError;
+    if (confirmPasswordError) errors.confirmPassword = confirmPasswordError;
   }
 
   return errors;
@@ -108,5 +183,6 @@ export function firstInvalidField(
     if (errors.displayName) return "displayName";
   }
   if (errors.password) return "password";
+  if (errors.confirmPassword) return "confirmPassword";
   return null;
 }

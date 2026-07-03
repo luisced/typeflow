@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getUser } from "./auth";
+import { getUser, setSession } from "./auth";
 import {
   API_URL,
   attemptSilentRefresh,
   getAccessToken,
   login,
+  requestPasswordReset,
   register,
   setAccessToken,
 } from "./api";
@@ -28,10 +29,12 @@ const userPayload = {
 
 beforeEach(() => {
   setAccessToken(null);
+  setSession(null);
   vi.stubGlobal("fetch", vi.fn());
 });
 
 afterEach(() => {
+  setSession(null);
   vi.restoreAllMocks();
 });
 
@@ -54,6 +57,22 @@ describe("register", () => {
     expect(fetch).toHaveBeenCalledWith(
       `${API_URL}/auth/register`,
       expect.objectContaining({ credentials: "include" })
+    );
+  });
+});
+
+describe("requestPasswordReset", () => {
+  it("posts the email with credentials included", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ ok: true }));
+
+    await requestPasswordReset("test@example.com");
+
+    expect(fetch).toHaveBeenCalledWith(
+      `${API_URL}/auth/forgot-password`,
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+      })
     );
   });
 });
@@ -100,6 +119,31 @@ describe("attemptSilentRefresh", () => {
 
     const ok = await attemptSilentRefresh();
     expect(ok).toBe(true);
+    expect(getUser()?.email).toBe("test@example.com");
+  });
+
+  it("does not clear a newer login when an older refresh fails later", async () => {
+    let resolveRefresh!: (value: Response) => void;
+    const refreshPending = new Promise<Response>((resolve) => {
+      resolveRefresh = resolve;
+    });
+
+    vi.mocked(fetch)
+      .mockImplementationOnce(() => refreshPending)
+      .mockResolvedValueOnce(
+        jsonResponse({
+          access_token: "tok-login",
+          token_type: "bearer",
+          user: userPayload,
+        })
+      );
+
+    const refreshResult = attemptSilentRefresh();
+    await login("test@example.com", "hunter2hunter2");
+    resolveRefresh(jsonResponse({ detail: "missing refresh" }, 401));
+
+    expect(await refreshResult).toBe(false);
+    expect(getAccessToken()).toBe("tok-login");
     expect(getUser()?.email).toBe("test@example.com");
   });
 });

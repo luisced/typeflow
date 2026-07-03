@@ -624,7 +624,7 @@ body::before {
   border: 1px solid var(--border);
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1180px) {
   .topbar {
     flex-direction: row;
     align-items: center;
@@ -650,7 +650,32 @@ body::before {
   }
 }
 
-@media (max-width: 767px) {
+/* Compact desktop: the mode segment + action cluster no longer fit side by
+   side at common laptop widths (~1280–1400px). Hide the ghost/caret text
+   labels (the icon + tooltip + aria-label already say what they do) and
+   tighten gaps instead of dropping to the mobile hamburger layout. */
+@media (min-width: 1180px) and (max-width: 1400px) {
+  .topbar-actions-desktop {
+    gap: 6px;
+  }
+  .topbar-actions-desktop button.ghost.ghost-toggle .ghost-toggle-label,
+  .topbar-actions-desktop .caret-label {
+    display: none;
+  }
+  .topbar-actions-desktop button.ghost.ghost-toggle {
+    width: 37px;
+    min-width: 37px;
+    padding: 0;
+  }
+  .topbar-actions-desktop button.ghost.ghost-icon {
+    padding: 0;
+    width: 37px;
+    min-width: 37px;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 1179px) {
   .topbar-inner .wordmark-btn,
   .topbar-inner .wordmark {
     flex-shrink: 1;
@@ -1005,6 +1030,45 @@ button.profile-run-row:hover .profile-run-chevron {
   color: var(--text-dim);
 }
 
+.lb-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 56px 24px 60px;
+  text-align: center;
+}
+
+.lb-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  margin-bottom: 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border-soft));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+}
+
+.lb-empty-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.lb-empty-sub {
+  margin: 0;
+  max-width: 320px;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
 /* ---- auth session bootstrap (no flash on reload) ---- */
 .auth-boot {
   min-height: 100dvh;
@@ -1030,7 +1094,7 @@ button.profile-run-row:hover .profile-run-chevron {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 22px;
   width: 100%;
   flex: 1;
 }
@@ -1038,7 +1102,7 @@ button.profile-run-row:hover .profile-run-chevron {
 .auth-card {
   position: relative;
   width: 100%;
-  max-width: 420px;
+  max-width: 480px;
   border-radius: calc(var(--radius) + 2px);
   background: linear-gradient(170deg, var(--surface-raised), var(--surface));
   border: 1px solid var(--border);
@@ -1061,16 +1125,50 @@ html.dark .auth-card {
 }
 
 .auth-card-content {
-  padding: 32px 32px 28px;
+  padding: 30px 30px 28px;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 26px;
+}
+
+.auth-mode-seg {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
+}
+
+.auth-mode-seg-btn {
+  min-height: 42px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.auth-mode-seg-btn[data-active="true"] {
+  background: var(--bg);
+  color: var(--text);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 1px 0 rgba(0, 0, 0, 0.06);
 }
 
 .auth-card-heading {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .auth-card-title {
@@ -1082,6 +1180,7 @@ html.dark .auth-card {
 
 .auth-card-sub {
   margin: 0;
+  min-height: 2.75rem;
   font-size: 0.875rem;
   line-height: 1.55;
   color: var(--text-dim);
@@ -1090,7 +1189,33 @@ html.dark .auth-card {
 .auth-card-form {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 22px;
+}
+
+.auth-typing-text {
+  display: inline;
+}
+
+.auth-typing-caret {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.05em;
+  margin-left: 1px;
+  transform: translateY(0.16em);
+  background: color-mix(in srgb, var(--accent) 72%, transparent);
+  border-radius: 2px;
+  animation: auth-caret-blink 1s step-end infinite;
+}
+
+@keyframes auth-caret-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  46%,
+  100% {
+    opacity: 0;
+  }
 }
 
 .auth-field {
@@ -1117,7 +1242,8 @@ html.dark .auth-card {
 
 .auth-input {
   width: 100%;
-  padding: 0.65rem 0.85rem;
+  min-height: 48px;
+  padding: 0.75rem 0.92rem;
   border-radius: calc(var(--radius) - 4px);
   border: 1.5px solid var(--border);
   background: var(--bg);
@@ -1159,6 +1285,50 @@ html.dark .auth-input--invalid:focus {
   color: var(--error);
 }
 
+.auth-guidance-list {
+  display: grid;
+  gap: 7px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.auth-guidance-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+.auth-guidance-item[data-state="success"] {
+  color: var(--text);
+}
+
+.auth-guidance-item[data-state="error"] {
+  color: var(--error);
+}
+
+.auth-guidance-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  min-width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  color: inherit;
+}
+
+.auth-guidance-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--text-faint);
+  opacity: 0.7;
+}
+
 .auth-error {
   display: flex;
   align-items: flex-start;
@@ -1175,6 +1345,24 @@ html.dark .auth-input--invalid:focus {
 html.dark .auth-error {
   background: rgba(255, 107, 107, 0.08);
   border-color: rgba(255, 107, 107, 0.2);
+}
+
+.auth-error-summary {
+  gap: 10px;
+}
+
+.auth-error-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.auth-error-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.auth-error-list li + li {
+  margin-top: 3px;
 }
 
 .auth-network-error {
@@ -1238,6 +1426,76 @@ html.dark .auth-submit-btn {
     0 4px 14px -6px rgba(255, 174, 87, 0.3);
 }
 
+.auth-password-feedback {
+  display: grid;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.auth-strength-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.auth-strength-label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.auth-strength-label[data-strength="weak"] {
+  color: var(--error);
+}
+
+.auth-strength-label[data-strength="fair"] {
+  color: #c27a1a;
+}
+
+.auth-strength-label[data-strength="good"] {
+  color: #2f8f58;
+}
+
+.auth-strength-label[data-strength="strong"] {
+  color: var(--accent);
+}
+
+.auth-strength-bars {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.auth-strength-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border) 75%, transparent);
+  transition: background 150ms ease, opacity 150ms ease;
+  opacity: 0.7;
+}
+
+.auth-strength-bar[data-active="true"] {
+  opacity: 1;
+}
+
+.auth-strength-bar[data-strength="weak"][data-active="true"] {
+  background: var(--error);
+}
+
+.auth-strength-bar[data-strength="fair"][data-active="true"] {
+  background: #c27a1a;
+}
+
+.auth-strength-bar[data-strength="good"][data-active="true"] {
+  background: #2f8f58;
+}
+
+.auth-strength-bar[data-strength="strong"][data-active="true"] {
+  background: var(--accent);
+}
+
 .auth-mode-switch {
   border: none;
   background: none;
@@ -1255,14 +1513,24 @@ html.dark .auth-submit-btn {
 .auth-guest-link {
   border: none;
   background: none;
-  padding: 4px;
+  padding: 6px 8px;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: var(--text-faint);
   cursor: pointer;
   transition: color 0.15s ease;
 }
 .auth-guest-link:hover {
+  color: var(--text);
+}
+
+.footer-github-link {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-dim);
+  transition: color 0.15s ease;
+}
+.footer-github-link:hover {
   color: var(--text);
 }
 
@@ -1298,7 +1566,7 @@ html.dark .auth-submit-btn {
   position: relative;
 }
 .auth-input-password {
-  padding-right: 2.75rem;
+  padding-right: 3rem;
 }
 .auth-password-toggle {
   position: absolute;
@@ -1318,6 +1586,83 @@ html.dark .auth-submit-btn {
 }
 .auth-password-toggle:hover {
   color: var(--text);
+}
+
+.auth-inline-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: -6px;
+}
+
+.auth-inline-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.auth-inline-link:hover {
+  opacity: 0.82;
+}
+
+.auth-forgot {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--surface-raised) 80%, transparent);
+}
+
+.auth-forgot-head {
+  display: grid;
+  gap: 4px;
+}
+
+.auth-forgot-form {
+  display: grid;
+  gap: 14px;
+}
+
+.auth-forgot-submit {
+  width: 100%;
+}
+
+.auth-success {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: #2f8f58;
+}
+
+html.dark .auth-success {
+  color: #6ccf92;
+}
+
+@media (max-width: 640px) {
+  .auth-card-content {
+    padding: 24px 20px 22px;
+    gap: 22px;
+  }
+
+  .auth-card-form {
+    gap: 18px;
+  }
+
+  .auth-card-sub {
+    min-height: 3.1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-typing-caret {
+    animation: none;
+  }
 }
 
 button.ghost {
@@ -1363,10 +1708,109 @@ button.ghost.ghost-active:hover {
   background: var(--surface);
 }
 
+/* ---- custom tooltip (replaces native title — instant, on-brand, reliable) ---- */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translate(-50%, -4px);
+  width: max-content;
+  max-width: 220px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: center;
+  white-space: normal;
+  letter-spacing: 0;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 1200;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+[data-tooltip]::before {
+  content: "";
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translate(-50%, -4px);
+  border: 5px solid transparent;
+  border-bottom-color: var(--text);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 1200;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+[data-tooltip]:hover::after,
+[data-tooltip]:hover::before,
+[data-tooltip]:focus-visible::after,
+[data-tooltip]:focus-visible::before {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  transition-delay: 0.35s;
+}
+[data-tooltip][disabled] {
+  pointer-events: auto;
+}
+
+/* ---- sign-in CTA (guest state) ---- */
+button.signin-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 37px;
+  padding: 8px 16px 8px 13px;
+  white-space: nowrap;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border-soft));
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  color: var(--accent-deep);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+button.signin-cta .signin-cta-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+button.signin-cta:hover {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+button.signin-cta:active {
+  transform: scale(0.97);
+}
+button.signin-cta:focus-visible {
+  outline: 2px solid var(--accent-glow);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+html.dark button.signin-cta {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+html.dark button.signin-cta:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
 /* ---- ghost racing toggle ---- */
 button.ghost.ghost-toggle {
-  min-height: 44px;
-  min-width: 44px;
+  min-height: 37px;
+  min-width: 37px;
   padding: 8px 12px;
 }
 button.ghost.ghost-toggle svg {
@@ -2906,7 +3350,7 @@ button.profile-run-row-page .profile-run-date {
 .wordmark-part {
   font-size: 27px;
 }
-@media (max-width: 767px) {
+@media (max-width: 1179px) {
   .topbar-inner .wordmark-part {
     font-size: 22px;
   }
@@ -3492,27 +3936,45 @@ button.hm-cell:focus-visible {
   animation: profile-skeleton-shimmer 1.2s ease-in-out infinite;
 }
 
-.profile-error-card {
-  border-color: rgba(192, 57, 43, 0.25);
-  background: rgba(192, 57, 43, 0.06);
-}
-html.dark .profile-error-card {
-  border-color: rgba(255, 107, 107, 0.25);
-  background: rgba(255, 107, 107, 0.06);
-}
-
 .profile-error-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(192, 57, 43, 0.25);
+  background: rgba(192, 57, 43, 0.06);
+  color: var(--error);
+}
+html.dark .profile-error-banner {
+  border-color: rgba(255, 107, 107, 0.25);
+  background: rgba(255, 107, 107, 0.08);
+}
+
+.profile-error-banner svg {
+  flex-shrink: 0;
 }
 
 .profile-error-banner p {
+  flex: 1;
   margin: 0;
   font-size: 0.8125rem;
   color: var(--error);
+}
+
+.profile-error-banner .ghost {
+  border-color: currentColor;
+  color: var(--error);
+}
+.profile-error-banner .ghost:hover {
+  color: var(--error);
+  border-color: currentColor;
+  background: rgba(192, 57, 43, 0.1);
+}
+html.dark .profile-error-banner .ghost:hover {
+  background: rgba(255, 107, 107, 0.12);
 }
 
 .profile-page .activity-heatmap {

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  normalizeUsernameInput,
+  passwordStrengthChecks,
+  passwordStrengthLabel,
   validateAuthForm,
+  validateConfirmPassword,
   validateDisplayName,
   validateEmail,
   validatePassword,
@@ -37,6 +41,10 @@ describe("validateUsername", () => {
 
   it("accepts valid username", () => {
     expect(validateUsername("luis_ced")).toBeNull();
+  });
+
+  it("normalizes username input to lowercase", () => {
+    expect(normalizeUsernameInput("Luis_Ced")).toBe("luis_ced");
   });
 });
 
@@ -76,7 +84,13 @@ describe("validateAuthForm", () => {
   it("returns all register field errors", () => {
     expect(
       validateAuthForm(
-        { email: "", password: "", username: "", displayName: "" },
+        {
+          email: "",
+          password: "",
+          confirmPassword: "",
+          username: "",
+          displayName: "",
+        },
         "register"
       )
     ).toEqual({
@@ -84,6 +98,7 @@ describe("validateAuthForm", () => {
       username: "Username is required.",
       displayName: "Display name is required.",
       password: "Password is required.",
+      confirmPassword: "Please confirm your password.",
     });
   });
 
@@ -95,9 +110,47 @@ describe("validateAuthForm", () => {
           username: "user_name",
           displayName: "User Name",
           password: "hunter2hunter2",
+          confirmPassword: "hunter2hunter2",
         },
         "register"
       )
     ).toEqual({});
+  });
+});
+
+describe("validateConfirmPassword", () => {
+  it("requires a repeated password", () => {
+    expect(validateConfirmPassword("hunter2hunter2", "")).toBe(
+      "Please confirm your password."
+    );
+  });
+
+  it("rejects mismatched passwords", () => {
+    expect(validateConfirmPassword("hunter2hunter2", "hunter2hunter3")).toBe(
+      "Passwords do not match."
+    );
+  });
+});
+
+describe("password strength helpers", () => {
+  it("flags personal info inside the password", () => {
+    expect(
+      passwordStrengthChecks("Luis1234!", {
+        email: "luis@example.com",
+        username: "luis_ced",
+        displayName: "Luis Cedillo",
+      })
+    ).toMatchObject({
+      length: true,
+      mixedCase: true,
+      numberOrSymbol: true,
+      noPersonalInfo: false,
+    });
+  });
+
+  it("returns human strength levels", () => {
+    expect(passwordStrengthLabel("short", {})).toBe("weak");
+    expect(passwordStrengthLabel("Password12", {})).toBe("good");
+    expect(passwordStrengthLabel("Password1234!@", {})).toBe("strong");
   });
 });

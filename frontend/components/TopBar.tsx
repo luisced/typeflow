@@ -156,7 +156,7 @@ function LeaderboardButton({ onClick }: { onClick?: () => void }) {
       type="button"
       className="ghost ghost-icon"
       aria-label="Leaderboard"
-      title="Leaderboard"
+      data-tooltip="Leaderboard"
       onClick={onClick}
     >
       <CrownIcon />
@@ -228,7 +228,7 @@ function ThemeToggle({
       className="ghost ghost-icon-only"
       aria-label="Toggle theme"
       onClick={onToggleTheme}
-      title={dark ? "Switch to light mode" : "Switch to dark mode"}
+      data-tooltip={dark ? "Switch to light mode" : "Switch to dark mode"}
     >
       {dark ? (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -377,11 +377,12 @@ function CaretSettings({
       <button
         className={`ghost ghost-icon${settingsOpen ? " ghost-active" : ""}`}
         aria-label="Caret style"
+        data-tooltip="Change caret style"
         aria-expanded={settingsOpen}
         onClick={() => onSettingsOpenChange(!settingsOpen)}
       >
         <CaretGlyph style={caretStyle} />
-        <span>caret</span>
+        <span className="caret-label">caret</span>
       </button>
       {settingsOpen && (
         <div
@@ -523,7 +524,7 @@ export default function TopBar(props: Props) {
 
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return;
-    const mq = window.matchMedia("(min-width: 768px)");
+    const mq = window.matchMedia("(min-width: 1180px)");
     const onChange = () => {
       if (mq.matches) setMobileMenuOpen(false);
     };
@@ -696,7 +697,7 @@ function GhostToggle({
       className={`ghost ghost-toggle ghost-icon${enabled ? " ghost-active" : ""}`}
       data-active={enabled ? "true" : undefined}
       disabled={isDisabled}
-      title={title}
+      data-tooltip={title}
       aria-label={title}
       aria-pressed={enabled}
       onClick={() => onToggle(!enabled)}

@@ -17,6 +17,7 @@ export class NetworkError extends Error {
 
 let accessToken: string | null = null;
 let refreshInFlight: Promise<boolean> | null = null;
+let authStateVersion = 0;
 
 type ApiUser = {
   id: string;
@@ -141,6 +142,20 @@ export function getAccessToken(): string | null {
 
 export function setAccessToken(token: string | null): void {
   accessToken = token;
+  authStateVersion += 1;
+}
+
+function commitAuthenticatedUser(token: string, user: AuthUser): AuthUser {
+  accessToken = token;
+  authStateVersion += 1;
+  setSession(user);
+  return user;
+}
+
+function clearAuthState(): void {
+  accessToken = null;
+  authStateVersion += 1;
+  clearSession();
 }
 
 function authPaths(path: string): boolean {
@@ -165,22 +180,23 @@ async function refreshAccessToken(): Promise<boolean> {
   if (refreshInFlight) return refreshInFlight;
 
   refreshInFlight = (async () => {
+    const requestVersion = authStateVersion;
     try {
       const res = await fetch(`${API_URL}/auth/refresh`, {
         method: "POST",
         credentials: "include",
       });
       if (!res.ok) {
-        accessToken = null;
-        clearSession();
+        if (authStateVersion === requestVersion) clearAuthState();
         return false;
       }
       const data = (await res.json()) as { access_token: string };
+      if (authStateVersion !== requestVersion) return false;
       accessToken = data.access_token;
+      authStateVersion += 1;
       return true;
     } catch {
-      accessToken = null;
-      clearSession();
+      if (authStateVersion === requestVersion) clearAuthState();
       return false;
     } finally {
       refreshInFlight = null;
@@ -216,7 +232,6 @@ export async function apiFetch(
   if (res.status === 401 && !retried && !path.startsWith("/auth/refresh")) {
     const ok = await refreshAccessToken();
     if (ok) return apiFetch(path, init, true);
-    clearSession();
   }
 
   return res;
@@ -245,10 +260,8 @@ export async function register(input: RegisterInput): Promise<AuthUser> {
     throw new Error(parseApiError(err, "Registration failed"));
   }
   const data = (await res.json()) as TokenResponse;
-  accessToken = data.access_token;
   const u = toAuthUser(data.user);
-  setSession(u);
-  return u;
+  return commitAuthenticatedUser(data.access_token, u);
 }
 
 export async function login(identifier: string, password: string): Promise<AuthUser> {
@@ -262,10 +275,8 @@ export async function login(identifier: string, password: string): Promise<AuthU
     throw new Error(parseApiError(err, "Invalid credentials"));
   }
   const data = (await res.json()) as TokenResponse;
-  accessToken = data.access_token;
   const u = toAuthUser(data.user);
-  setSession(u);
-  return u;
+  return commitAuthenticatedUser(data.access_token, u);
 }
 
 export async function logout(): Promise<void> {
@@ -273,20 +284,31 @@ export async function logout(): Promise<void> {
     method: "POST",
     credentials: "include",
   }).catch(() => {});
-  accessToken = null;
+  clearAuthState();
   clearKeyboards();
-  clearSession();
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  const res = await apiFetch("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email: email.trim() }),
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(parseApiError(err, "Couldn't request password reset"));
+  }
 }
 
 export async function attemptSilentRefresh(): Promise<boolean> {
   const ok = await refreshAccessToken();
   if (!ok) return false;
+  const refreshVersion = authStateVersion;
   try {
     await getMe();
     return true;
   } catch {
-    accessToken = null;
-    clearSession();
+    if (authStateVersion === refreshVersion) clearAuthState();
     return false;
   }
 }
@@ -465,7 +487,6 @@ export async function clearServerHistory(): Promise<void> {
 export async function deleteAccount(): Promise<void> {
   const res = await apiFetch("/me", { method: "DELETE" });
   if (!res.ok) throw new Error("Delete failed");
-  accessToken = null;
+  clearAuthState();
   clearKeyboards();
-  clearSession();
 }
