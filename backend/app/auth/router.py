@@ -31,7 +31,10 @@ def _set_refresh_cookie(response: Response, raw: str) -> None:
         max_age=settings.refresh_token_days * 86400,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="strict",
+        # None is required when frontend and API are on different domains
+        # (browsers drop Strict/Lax cookies on cross-site fetch); it needs
+        # Secure, which is exactly when cookie_secure is true anyway.
+        samesite="none" if settings.cookie_secure else "lax",
         path="/auth",
     )
 
