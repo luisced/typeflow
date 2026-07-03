@@ -11,6 +11,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.1] - 2026-07-02
+
+### Fixed
+- Backend logs were written to stderr, which some PaaS log collectors (Railway, etc.) bucket as "error" regardless of level - every healthy startup/access log line showed up red. Moved to stdout; colored output is unaffected
+
+---
+
 ## [0.2.0] - 2026-07-02
 
 ### Added
