@@ -6,7 +6,8 @@ WORKDIR /app
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
-    UV_PYTHON_DOWNLOADS=never
+    UV_PYTHON_DOWNLOADS=never \
+    PYTHONUNBUFFERED=1
 
 RUN addgroup --system typeflow \
     && adduser --system --ingroup typeflow --home /app typeflow

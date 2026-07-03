@@ -202,15 +202,17 @@ def log_status(kind: str, detail: str, status: str = "") -> None:
 
 
 def setup_logging(*, level: str = "INFO", color: bool = True) -> None:
-    # Trust the config flag; don't gate on isatty() — Docker pipes stderr even
+    # Trust the config flag; don't gate on isatty() — Docker pipes stdout even
     # when the terminal renders ANSI fine (e.g. `docker compose logs --no-log-prefix`).
+    # stdout (not stderr) so PaaS log collectors that bucket by stream
+    # (Railway, etc.) don't flag every INFO line as an error.
     use_color = color
 
     root = logging.getLogger()
     root.handlers.clear()
     root.setLevel(level)
 
-    handler = logging.StreamHandler(sys.stderr)
+    handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(ColoredFormatter(use_color=use_color))
     root.addHandler(handler)
 
@@ -219,7 +221,7 @@ def setup_logging(*, level: str = "INFO", color: bool = True) -> None:
     access.handlers.clear()
     access.propagate = False
     access.setLevel(level)
-    access_handler = logging.StreamHandler(sys.stderr)
+    access_handler = logging.StreamHandler(sys.stdout)
     access_handler.setFormatter(AccessLogFormatter(use_color=use_color))
     access.addHandler(access_handler)
 
@@ -227,7 +229,7 @@ def setup_logging(*, level: str = "INFO", color: bool = True) -> None:
     status.handlers.clear()
     status.propagate = False
     status.setLevel(level)
-    status_handler = logging.StreamHandler(sys.stderr)
+    status_handler = logging.StreamHandler(sys.stdout)
     status_handler.setFormatter(StatusLogFormatter(use_color=use_color))
     status.addHandler(status_handler)
 
