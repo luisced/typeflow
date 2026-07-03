@@ -24,6 +24,7 @@ tsconfig.tsbuildinfo
 # tooling
 .claude/
 .superpowers/
+.worktrees/
 docs/superpowers/
 
 # os
