@@ -1,0 +1,4 @@
+# Thin wrapper so Railway (or any PaaS that requires a Dockerfile in the repo)
+# can stay connected to GitHub for auto-deploy, without building the app
+# itself. It just re-pulls whatever the release pipeline last published.
+FROM ghcr.io/luisced/typeflow-web:latest
