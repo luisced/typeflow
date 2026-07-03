@@ -9,10 +9,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [0.2.0] - 2026-07-02
+
 ### Added
 - App version shown in the footer, read from `package.json`
 
 ### Fixed
+- Refresh-token cookie was hardcoded to `SameSite=Strict`, which browsers silently drop on cross-site requests - this broke auth entirely on split-domain deploys (frontend and API on different domains, e.g. Railway). Now derived from `TYPEFLOW_COOKIE_SECURE`: `None` in production, `Lax` for local HTTP dev
+- Backend now respects `$PORT` at runtime instead of a hardcoded 8000, for platforms (Railway, Render) that assign the listen port dynamically
 - `dailyStats` test used a hardcoded date that aged out of the 365-day window; now relative to "now"
 
 ---
